@@ -84,6 +84,7 @@ export default function App() {
   const keywordInputRef = useRef(null);
   const priceMinInputRef = useRef(null);
   const priceMaxInputRef = useRef(null);
+  const provinceInputRef = useRef(null);
   const [priceMinFocused, setPriceMinFocused] = useState(false);
   const [priceMaxFocused, setPriceMaxFocused] = useState(false);
 
@@ -224,8 +225,15 @@ export default function App() {
               className="w-full border p-2 rounded-lg"
               placeholder="ค้นหาจังหวัด (Province)..."
               value={provinceFilter}
-              onChange={e => setProvinceFilter(e.target.value)}
+              onChange={e => {
+                setProvinceFilter(e.target.value);
+                const v = e.target.value;
+                if (provinces.includes(v)) {
+                  provinceInputRef.current && provinceInputRef.current.blur();
+                }
+              }}
               list="province-list"
+              ref={provinceInputRef}
             />
             <datalist id="province-list">
               {provinces.map(prov => (
