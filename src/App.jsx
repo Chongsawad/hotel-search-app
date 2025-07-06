@@ -29,7 +29,8 @@ export default function App() {
       setSQL(SQL);
 
       // Fetch the .sqlite file from public
-      const res = await fetch("/hotels.sqlite");
+      const res = await fetch("/all.sqlite");
+      // const res = await fetch("/hotels.sqlite");
       const buf = await res.arrayBuffer();
       const db = new SQL.Database(new Uint8Array(buf));
       if (!mounted) return;
@@ -80,6 +81,8 @@ export default function App() {
   // Compare hotel state
   const [compareHotels, setCompareHotels] = useState([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  // Enable/disable price filter
+  const [enablePriceFilter, setEnablePriceFilter] = useState(true);
 
   const keywordInputRef = useRef(null);
   const priceMinInputRef = useRef(null);
@@ -115,13 +118,15 @@ export default function App() {
         hotel.nameTh?.includes(keyword) ||
         hotel.nameEn?.toLowerCase().includes(keyword.toLowerCase());
 
-      const minRoomPrice = hotel.rooms.length > 0
-        ? Math.min(...hotel.rooms.map(r => r.price))
-        : Infinity;
-
-      const minOK = priceMin === "" ? true : minRoomPrice >= priceMin;
-      const maxOK = priceMax === "" ? true : minRoomPrice <= priceMax;
-      const priceMatch = minOK && maxOK;
+      let priceMatch = true;
+      if (enablePriceFilter) {
+        const minRoomPrice = hotel.rooms.length > 0
+          ? Math.min(...hotel.rooms.map(r => r.price))
+          : Infinity;
+        const minOK = priceMin === "" ? true : minRoomPrice >= priceMin;
+        const maxOK = priceMax === "" ? true : minRoomPrice <= priceMax;
+        priceMatch = minOK && maxOK;
+      }
 
       return hotelMatch && priceMatch;
     });
@@ -148,7 +153,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter]);
+  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter, enablePriceFilter]);
 
   // Reset page to 1 when filters or sort change, including region/province
   useEffect(() => {
@@ -341,6 +346,12 @@ export default function App() {
             </button>
           </div>
         </div>
+
+        {/* Price filter toggle and info (moved below all filters) */}
+        <PriceFilterToggleSection
+          enablePriceFilter={enablePriceFilter}
+          setEnablePriceFilter={setEnablePriceFilter}
+        />
         <div className="mb-2 text-sm text-gray-700">
           พบ {filteredHotels.length.toLocaleString()} โรงแรม
         </div>
@@ -651,6 +662,43 @@ function MapView({ hotels }) {
   return (
     <div className="h-96 w-full rounded-2xl bg-gray-200 flex items-center justify-center">
       <span className="text-gray-500">(Map view is not implemented in this preview, but should plot {hotels.length} hotels by coordinates.)</span>
+    </div>
+  );
+}
+// Price filter section with expand/collapse UI
+function PriceFilterToggleSection({ enablePriceFilter, setEnablePriceFilter }) {
+  const [expanded, setExpanded] = React.useState(false);
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-2">
+        <label className="inline-flex items-center cursor-pointer text-xs">
+          <input
+            type="checkbox"
+            checked={enablePriceFilter}
+            onChange={() => setEnablePriceFilter(v => !v)}
+            className="mr-1"
+          />
+          ใช้ตัวกรองราคา
+        </label>
+        <button
+          type="button"
+          className="ml-2 flex items-center text-blue-600 text-xs"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          {expanded ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+          {expanded ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}
+        </button>
+      </div>
+      <div className="mt-1 text-xs text-gray-600">
+        {!expanded ? (
+          <span>ตัวเลือกนี้ใช้กรองราคา (เฉพาะธุรกิจที่มีราคาห้องพัก เช่น โรงแรม)</span>
+        ) : (
+          <span>
+            ตัวเลือกนี้จะใช้ตัวกรองราคาห้องพัก ซึ่งเหมาะสำหรับโรงแรมหรือที่พักที่มีข้อมูลราคาห้องพักเท่านั้น สำหรับธุรกิจประเภทอื่น เช่น ร้านอาหาร สปา รถเช่า ฯลฯ จะไม่มีราคาห้องพักให้กรอง จึงควรปิดการใช้ตัวกรองราคาหากต้องการค้นหาทุกธุรกิจ
+          </span>
+        )}
+      </div>
     </div>
   );
 }
