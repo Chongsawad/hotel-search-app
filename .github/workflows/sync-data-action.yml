@@ -1,0 +1,52 @@
+name: Fetch, Convert, and Commit Data
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Every day at 1am UTC
+  workflow_dispatch:      # Allow manual run
+
+jobs:
+  fetch-convert-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install requirements
+        run: pip install requests
+
+      - name: Fetch JSON data from API
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          AUTH_HEADER: ${{ secrets.AUTH_HEADER }}
+        run: |
+          curl --request POST \
+            --url "${API_URL}" \
+            --header 'Accept-Encoding: gzip, deflate, br' \
+            --header 'Accept-Language: en-GB,en-US;q=0.9,en;q=0.8' \
+            --header "Authorization: ${AUTH_HEADER}" \
+            --header 'Cache-Control: no-cache' \
+            --header 'Content-Type: application/json' \
+            --data '{"page": 1, "limit": 99, "businessType": ["500040001"]}' \
+            -o raw-data.json
+
+      - name: Convert JSON to SQLite
+        run: |
+          python .github/scripts/json_to_sqlite.py raw-data.json all.sqlite
+
+      - name: Commit and push SQLite file
+        run: |
+          # Configure git user using repository secrets GIT_USER_NAME and GIT_USER_EMAIL
+          git config --global user.name "${{ secrets.GIT_USER_NAME }}"
+          git config --global user.email "${{ secrets.GIT_USER_EMAIL }}"
+          git add all.sqlite
+          git commit -m "🚀 Updated sqlite data [automated]" || echo "No changes to commit"
+          git push
+        env:
+          # This is set automatically on GitHub Actions runners
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
