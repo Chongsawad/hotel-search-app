@@ -5,6 +5,14 @@ import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook
 
 
 export default function App() {
+  const DEFAULT_FILTERS = {
+    keyword: "",
+    region: "",
+    province: "",
+    priceMin: 1500,
+    priceMax: 20000,
+    sortOrder: "asc"
+  };
   const [SQL, setSQL] = useState(null);
   const [db, setDb] = useState(null);
   const [hotels, setHotels] = useState([]);
@@ -47,6 +55,7 @@ export default function App() {
           location: locationLat && locationLng ? [locationLng, locationLat] : null,
           rooms: rooms ? JSON.parse(rooms) : [],
           _full: {
+            regionScope,
             contactMobilePhoneNo, contactEmail, bizContactWebsite, bizContactFacebook,
             bizContactInstagram, contactLine, addressNo, road, district, subDistrict, province, postalCode
           }
@@ -58,12 +67,14 @@ export default function App() {
     return () => { mounted = false; };
   }, []);
 
-  const [keyword, setKeyword] = useState("");
-  const [priceMin, setPriceMin] = useState(1500);
-  const [priceMax, setPriceMax] = useState(200000);
+  const [keyword, setKeyword] = useState(DEFAULT_FILTERS.keyword);
+  const [regionFilter, setRegionFilter] = useState(DEFAULT_FILTERS.region);
+  const [provinceFilter, setProvinceFilter] = useState(DEFAULT_FILTERS.province);
+  const [priceMin, setPriceMin] = useState(DEFAULT_FILTERS.priceMin);
+  const [priceMax, setPriceMax] = useState(DEFAULT_FILTERS.priceMax);
   const [view, setView] = useState("list");
   const [openRooms, setOpenRooms] = useState({});
-  const [sortOrder, setSortOrder] = useState("asc");
+  const [sortOrder, setSortOrder] = useState(DEFAULT_FILTERS.sortOrder);
   const [openContact, setOpenContact] = useState({});
   const [modalImage, setModalImage] = useState(null);
   // Compare hotel state
@@ -80,9 +91,25 @@ export default function App() {
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
 
+  // Build unique/sorted region and province lists
+  const regions = useMemo(
+    () => [...new Set(hotels.map(h => h._full?.regionScope).filter(Boolean))].sort(),
+    [hotels]
+  );
+  const provinces = useMemo(
+    () => [...new Set(hotels.map(h => h._full?.province).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")),
+    [hotels]
+  );
+
+
   // Filtering logic
   const filteredHotels = useMemo(() => {
     const filtered = hotels.filter((hotel) => {
+      // Region filter
+      if (regionFilter && hotel._full?.regionScope !== regionFilter) return false;
+      // Province filter
+      if (provinceFilter && (!hotel._full?.province || !hotel._full.province.includes(provinceFilter))) return false;
+
       const hotelMatch =
         hotel.nameTh?.includes(keyword) ||
         hotel.nameEn?.toLowerCase().includes(keyword.toLowerCase());
@@ -120,13 +147,13 @@ export default function App() {
       }
       return 0;
     });
-  }, [hotels, keyword, priceMin, priceMax, sortOrder]);
+  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter]);
 
-  // Reset page to 1 when filters or sort change
+  // Reset page to 1 when filters or sort change, including region/province
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line
-  }, [hotels, keyword, priceMin, priceMax, sortOrder]);
+  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter]);
 
   // Compare feature logic
   function toggleCompareHotel(hotelId) {
@@ -176,10 +203,40 @@ export default function App() {
             )}
           </div>
         </div>
-        {/* Min/Max/Sort/Toggle as horizontal scroll bar below */}
-        <div className="flex gap-2 mb-4 items-center overflow-x-auto scrollbar-hide py-1">
+        {/* Main Filter Controls Bar */}
+        <div className="flex gap-2 w-full items-center overflow-x-auto scrollbar-hide py-1">
+          {/* Region filter */}
+          <div className="flex-1 min-w-0">
+            <select
+              value={regionFilter}
+              onChange={e => setRegionFilter(e.target.value)}
+              className="w-full border p-2 rounded-lg"
+            >
+              <option value="">ทุกภาค (All regions)</option>
+              {regions.map(region => (
+                <option value={region} key={region}>{region}</option>
+              ))}
+            </select>
+          </div>
+          {/* Province filter */}
+          <div className="flex-1 min-w-0">
+            <input
+              className="w-full border p-2 rounded-lg"
+              placeholder="ค้นหาจังหวัด (Province)..."
+              value={provinceFilter}
+              onChange={e => setProvinceFilter(e.target.value)}
+              list="province-list"
+            />
+            <datalist id="province-list">
+              {provinces.map(prov => (
+                <option value={prov} key={prov}>{prov}</option>
+              ))}
+            </datalist>
+          </div>
+        </div>
+        <div className="flex gap-2 w-full items-center overflow-x-auto scrollbar-hide py-1">
           {/* Min Price */}
-          <div className="relative w-36 flex-shrink-0">
+          <div className="flex-1 min-w-0 relative">
             <input
               type="number"
               min={0}
@@ -211,7 +268,7 @@ export default function App() {
             )}
           </div>
           {/* Max Price */}
-          <div className="relative w-36 flex-shrink-0">
+          <div className="flex-1 min-w-0 relative">
             <input
               type="number"
               min={0}
@@ -242,8 +299,10 @@ export default function App() {
               </button>
             )}
           </div>
+        </div>
+        <div className="flex gap-2 w-full mb-4 items-center overflow-x-auto scrollbar-hide py-1">
           {/* Sort Order */}
-          <div className="w-40 flex-shrink-0">
+          <div className="flex-1 min-w-0">
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
@@ -257,19 +316,20 @@ export default function App() {
               <option value="alphaEnDesc">Name (Z-A)</option>
             </select>
           </div>
-          {/* List/Map Toggle */}
-          <div className="flex gap-1 ml-2 flex-shrink-0">
+          {/* Reset Filters Button (styled like List button) */}
+          <div className="flex-shrink-0">
             <button
-              className={view === "list" ? "bg-black text-white rounded-xl px-3 py-2" : "bg-white text-black border rounded-xl px-3 py-2"}
-              onClick={() => setView("list")}
+              className="bg-white border border-gray-300 text-black rounded-xl hover:bg-gray-100 transition rounded-xl px-3 py-2"
+              onClick={() => {
+                setKeyword(DEFAULT_FILTERS.keyword);
+                setRegionFilter(DEFAULT_FILTERS.region);
+                setProvinceFilter(DEFAULT_FILTERS.province);
+                setPriceMin(DEFAULT_FILTERS.priceMin);
+                setPriceMax(DEFAULT_FILTERS.priceMax);
+                setSortOrder(DEFAULT_FILTERS.sortOrder);
+              }}
             >
-              <List className="w-4 h-4 mr-1 inline" /> รายชื่อ
-            </button>
-            <button
-              className={view === "map" ? "bg-black text-white rounded-xl px-3 py-2" : "bg-white text-black border rounded-xl px-3 py-2"}
-              onClick={() => setView("map")}
-            >
-              <Map className="w-4 h-4 mr-1 inline" /> แผนที่
+              รีเซ็ตตัวกรอง
             </button>
           </div>
         </div>
