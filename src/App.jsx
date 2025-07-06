@@ -1,6 +1,6 @@
 // Phuket Hotels Vite React App - Entry point
 import React, { useState, useMemo } from "react";
-import { MapPin, ChevronDown, ChevronUp, List, Map } from "lucide-react";
+import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook, Instagram } from "lucide-react";
 import hotelData from "../phuket-hotels.json";
 
 function extractHotels(rawData) {
@@ -30,20 +30,36 @@ export default function App() {
   const [priceMax, setPriceMax] = useState(200000);
   const [view, setView] = useState("list");
   const [openRooms, setOpenRooms] = useState({});
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [openContact, setOpenContact] = useState({});
 
   // Filtering logic
   const filteredHotels = useMemo(() => {
-    return hotels.filter((hotel) => {
+    const filtered = hotels.filter((hotel) => {
       const hotelMatch =
         hotel.nameTh?.includes(keyword) ||
         hotel.nameEn?.toLowerCase().includes(keyword.toLowerCase());
-      // Room price filtering
-      const roomMatch = hotel.rooms.some(
-        (r) => r.price >= priceMin && r.price <= priceMax
-      );
-      return hotelMatch && roomMatch;
+
+      const minRoomPrice = hotel.rooms.length > 0
+        ? Math.min(...hotel.rooms.map(r => r.price))
+        : Infinity;
+
+      const priceMatch = minRoomPrice >= priceMin && minRoomPrice <= priceMax;
+
+      return hotelMatch && priceMatch;
     });
-  }, [keyword, priceMin, priceMax]);
+
+    // Sort by minimum room price according to sortOrder
+    return filtered.sort((a, b) => {
+      const aMin = a.rooms.length > 0 ? Math.min(...a.rooms.map(r => r.price)) : Infinity;
+      const bMin = b.rooms.length > 0 ? Math.min(...b.rooms.map(r => r.price)) : Infinity;
+      if (sortOrder === "asc") {
+        return aMin - bMin;
+      } else {
+        return bMin - aMin;
+      }
+    });
+  }, [keyword, priceMin, priceMax, sortOrder]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -71,6 +87,14 @@ export default function App() {
             onChange={(e) => setPriceMax(Number(e.target.value))}
             className="w-full md:w-36 border p-2 rounded-lg"
           />
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="w-full md:w-36 border p-2 rounded-lg"
+          >
+            <option value="asc">ต่ำสุด</option>
+            <option value="desc">สูงสุด</option>
+          </select>
           <div className="flex gap-1 ml-2">
             <button
               className={view === "list" ? "bg-black text-white rounded-xl px-3 py-2" : "bg-white text-black border rounded-xl px-3 py-2"}
@@ -86,7 +110,10 @@ export default function App() {
             </button>
           </div>
         </div>
-        {view === "list" ? (
+        <div className="mb-2 text-sm text-gray-700">
+          พบ {filteredHotels.length.toLocaleString()} โรงแรม
+        </div>
+        {view === "list" ? ( 
           <div className="grid gap-4">
             {filteredHotels.length === 0 ? (
               <div className="text-center py-10 text-gray-400">ไม่พบข้อมูลโรงแรม</div>
@@ -110,11 +137,89 @@ export default function App() {
                     <div className="flex flex-col flex-1 gap-1">
                       <div className="font-semibold text-lg">{hotel.nameTh || hotel.nameEn}</div>
                       <div className="text-xs text-gray-600 mb-2">{hotel.nameEn}</div>
+                      {hotel.rooms.length > 0 ? (
+                        <div className="text-sm text-green-700 mb-1">
+                          ราคาเริ่มต้น {Math.min(...hotel.rooms.map(r => r.price)).toLocaleString()} ฿
+                        </div>
+                      ) : null}
                       <div className="flex items-center gap-1 text-sm text-gray-700">
                         <MapPin className="w-4 h-4 text-gray-500" />
                         <span>{hotel.address}</span>
+                        {hotel.location ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${hotel.location[1]},${hotel.location[0]}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-2 underline text-blue-600 text-xs"
+                          >
+                            Google Maps
+                          </a>
+                        ) : null}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">ติดต่อ: {hotel.contact}</div>
+                      <button
+                        className="mt-3 w-fit flex items-center border rounded-xl px-3 py-1 text-sm"
+                        onClick={() => setOpenContact((s) => ({ ...s, [hotel.id]: !s[hotel.id] }))}
+                      >
+                        {openContact[hotel.id] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        <span className="ml-1">{openContact[hotel.id] ? "ซ่อนข้อมูลติดต่อ" : "ดูข้อมูลติดต่อ"}</span>
+                      </button>
+                      {openContact[hotel.id] && (
+                        <div className="border rounded-xl bg-gray-50 p-3 mt-2 mb-2 flex flex-col gap-1">
+                          {/* Contact details, show if available */}
+                          {hotelData.data.data.find(h => h.id === hotel.id) && (() => {
+                            const h = hotelData.data.data.find(h => h.id === hotel.id);
+                            return (
+                              <>
+                                {h.contactMobilePhoneNo && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Phone className="w-4 h-4 text-gray-600" />
+                                    <span>{h.contactMobilePhoneNo}</span>
+                                  </div>
+                                )}
+                                {h.contactEmail && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Mail className="w-4 h-4 text-gray-600" />
+                                    <span>{h.contactEmail}</span>
+                                  </div>
+                                )}
+                                {h.bizContactWebsite && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Globe className="w-4 h-4 text-gray-600" />
+                                    <a href={h.bizContactWebsite} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">{h.bizContactWebsite}</a>
+                                  </div>
+                                )}
+                                {h.bizContactFacebook && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Facebook className="w-4 h-4 text-gray-600" />
+                                    <a href={h.bizContactFacebook} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Facebook</a>
+                                  </div>
+                                )}
+                                {h.contactLine && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    {/* No icon in lucide-react for Line, use custom svg or text */}
+                                    <span className="w-4 h-4 text-gray-600 font-bold">LINE</span>
+                                    <a href={h.contactLine} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Line</a>
+                                  </div>
+                                )}
+                                {h.bizContactInstagram && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Instagram className="w-4 h-4 text-gray-600" />
+                                    <a href={h.bizContactInstagram} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Instagram</a>
+                                  </div>
+                                )}
+                                {/* Always show address */}
+                                <div className="flex items-center gap-2 text-sm">
+                                  <MapPin className="w-4 h-4 text-gray-600" />
+                                  <span>
+                                    {`${h.addressNo || ""} ${h.road || ""} ${h.district || ""} ${h.subDistrict || ""} ${h.province || ""} ${h.postalCode || ""}`.trim()}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                       <button
                         className="mt-3 w-fit flex items-center border rounded-xl px-3 py-1 text-sm"
                         onClick={() => setOpenRooms((s) => ({ ...s, [hotel.id]: !s[hotel.id] }))}
