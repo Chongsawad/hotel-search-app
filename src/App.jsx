@@ -1,5 +1,5 @@
 // Phuket Hotels Vite React App - Entry point
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook, Instagram, X, ArrowLeftRight } from "lucide-react";
 import hotelData from "../phuket-hotels.json";
 
@@ -36,6 +36,8 @@ export default function App() {
   // Compare hotel state
   const [compareHotels, setCompareHotels] = useState([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
+
+  const keywordInputRef = useRef(null);
 
   // Filtering logic
   const filteredHotels = useMemo(() => {
@@ -96,6 +98,8 @@ export default function App() {
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             className="w-full md:w-60 border p-2 rounded-lg"
+            ref={keywordInputRef}
+            onKeyDown={e => { if (e.key === "Enter") { keywordInputRef.current && keywordInputRef.current.blur(); } }}
           />
           <input
             type="number"
