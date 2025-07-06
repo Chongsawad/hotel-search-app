@@ -38,6 +38,10 @@ export default function App() {
   const [showCompareModal, setShowCompareModal] = useState(false);
 
   const keywordInputRef = useRef(null);
+  const priceMinInputRef = useRef(null);
+  const priceMaxInputRef = useRef(null);
+  const [priceMinFocused, setPriceMinFocused] = useState(false);
+  const [priceMaxFocused, setPriceMaxFocused] = useState(false);
 
   // Filtering logic
   const filteredHotels = useMemo(() => {
@@ -50,7 +54,9 @@ export default function App() {
         ? Math.min(...hotel.rooms.map(r => r.price))
         : Infinity;
 
-      const priceMatch = minRoomPrice >= priceMin && minRoomPrice <= priceMax;
+      const minOK = priceMin === "" ? true : minRoomPrice >= priceMin;
+      const maxOK = priceMax === "" ? true : minRoomPrice <= priceMax;
+      const priceMatch = minOK && maxOK;
 
       return hotelMatch && priceMatch;
     });
@@ -92,44 +98,116 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto py-6 px-2">
-        <div className="flex flex-col md:flex-row gap-2 mb-4 items-center">
-          <input
-            placeholder="ค้นหาโรงแรม หรือ Hotel Name..."
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="w-full md:w-60 border p-2 rounded-lg"
-            ref={keywordInputRef}
-            onKeyDown={e => { if (e.key === "Enter") { keywordInputRef.current && keywordInputRef.current.blur(); } }}
-          />
-          <input
-            type="number"
-            min={0}
-            placeholder="ราคาขั้นต่ำ (Min THB)"
-            value={priceMin}
-            onChange={(e) => setPriceMin(Number(e.target.value))}
-            className="w-full md:w-36 border p-2 rounded-lg"
-          />
-          <input
-            type="number"
-            min={0}
-            placeholder="ราคาสูงสุด (Max THB)"
-            value={priceMax}
-            onChange={(e) => setPriceMax(Number(e.target.value))}
-            className="w-full md:w-36 border p-2 rounded-lg"
-          />
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-            className="w-full md:w-36 border p-2 rounded-lg"
-          >
-            <option value="asc">ราคาต่ำสุด</option>
-            <option value="desc">ราคาสูงสุด</option>
-            <option value="alphaThAsc">ชื่อ (ก-ฮ)</option>
-            <option value="alphaThDesc">ชื่อ (ฮ-ก)</option>
-            <option value="alphaEnAsc">Name (A-Z)</option>
-            <option value="alphaEnDesc">Name (Z-A)</option>
-          </select>
-          <div className="flex gap-1 ml-2">
+        {/* Name Search (always full width) */}
+        <div className="w-full mb-2">
+          <div className="relative">
+            <input
+              placeholder="ค้นหาโรงแรม หรือ Hotel Name..."
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="w-full border p-2 rounded-lg pr-8"
+              ref={keywordInputRef}
+              onKeyDown={e => { if (e.key === "Enter") { keywordInputRef.current && keywordInputRef.current.blur(); } }}
+            />
+            {keyword !== "" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setKeyword("");
+                  keywordInputRef.current && keywordInputRef.current.focus();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                tabIndex={-1}
+                aria-label="Clear"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Min/Max/Sort/Toggle as horizontal scroll bar below */}
+        <div className="flex gap-2 mb-4 items-center overflow-x-auto scrollbar-hide py-1">
+          {/* Min Price */}
+          <div className="relative w-36 flex-shrink-0">
+            <input
+              type="number"
+              min={0}
+              placeholder="ราคาขั้นต่ำ (Min THB)"
+              value={priceMinFocused && priceMin === 0 ? "" : (priceMin || "")}
+              onFocus={() => {
+                setPriceMinFocused(true);
+                if (priceMin === 0) setPriceMin("");
+              }}
+              onBlur={() => {
+                setPriceMinFocused(false);
+                if (priceMin === "" || isNaN(priceMin)) setPriceMin(0);
+              }}
+              onChange={e => setPriceMin(e.target.value === "" ? "" : Number(e.target.value))}
+              className="border p-2 rounded-lg w-full pr-8"
+              ref={priceMinInputRef}
+              onKeyDown={e => { if (e.key === "Enter") { priceMinInputRef.current && priceMinInputRef.current.blur(); } }}
+            />
+            {priceMin !== "" && priceMin !== 0 && (
+              <button
+                type="button"
+                onClick={() => setPriceMin("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                tabIndex={-1}
+                aria-label="Clear"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {/* Max Price */}
+          <div className="relative w-36 flex-shrink-0">
+            <input
+              type="number"
+              min={0}
+              placeholder="ราคาสูงสุด (Max THB)"
+              value={priceMaxFocused && priceMax === 0 ? "" : (priceMax || "")}
+              onFocus={() => {
+                setPriceMaxFocused(true);
+                if (priceMax === 0) setPriceMax("");
+              }}
+              onBlur={() => {
+                setPriceMaxFocused(false);
+                if (priceMax === "" || isNaN(priceMax)) setPriceMax(0);
+              }}
+              onChange={e => setPriceMax(e.target.value === "" ? "" : Number(e.target.value))}
+              className="border p-2 rounded-lg w-full pr-8"
+              ref={priceMaxInputRef}
+              onKeyDown={e => { if (e.key === "Enter") { priceMaxInputRef.current && priceMaxInputRef.current.blur(); } }}
+            />
+            {priceMax !== "" && priceMax !== 0 && (
+              <button
+                type="button"
+                onClick={() => setPriceMax("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                tabIndex={-1}
+                aria-label="Clear"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {/* Sort Order */}
+          <div className="w-40 flex-shrink-0">
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="w-full border p-2 rounded-lg"
+            >
+              <option value="asc">ราคาต่ำสุด</option>
+              <option value="desc">ราคาสูงสุด</option>
+              <option value="alphaThAsc">ชื่อ (ก-ฮ)</option>
+              <option value="alphaThDesc">ชื่อ (ฮ-ก)</option>
+              <option value="alphaEnAsc">Name (A-Z)</option>
+              <option value="alphaEnDesc">Name (Z-A)</option>
+            </select>
+          </div>
+          {/* List/Map Toggle */}
+          <div className="flex gap-1 ml-2 flex-shrink-0">
             <button
               className={view === "list" ? "bg-black text-white rounded-xl px-3 py-2" : "bg-white text-black border rounded-xl px-3 py-2"}
               onClick={() => setView("list")}
