@@ -4,10 +4,16 @@ on:
   schedule:
     - cron: '0 1 * * *'  # Every day at 1am UTC
   workflow_dispatch:      # Allow manual run
+    inputs:
+      environment:
+        description: 'Target environment for this workflow run'
+        required: true
+        default: 'Production'
 
 jobs:
   fetch-convert-commit:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,7 +28,6 @@ jobs:
 
       - name: Fetch JSON data from API
         env:
-          API_URL: ${{ secrets.API_URL }}
           AUTH_HEADER: ${{ secrets.AUTH_HEADER }}
         run: |
           curl --insecure --request POST \
