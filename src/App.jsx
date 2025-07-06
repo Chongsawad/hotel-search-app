@@ -1,6 +1,6 @@
 // Phuket Hotels Vite React App - Entry point
 import React, { useState, useMemo } from "react";
-import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook, Instagram } from "lucide-react";
+import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook, Instagram, X, ArrowLeftRight } from "lucide-react";
 import hotelData from "../phuket-hotels.json";
 
 function extractHotels(rawData) {
@@ -32,6 +32,10 @@ export default function App() {
   const [openRooms, setOpenRooms] = useState({});
   const [sortOrder, setSortOrder] = useState("asc");
   const [openContact, setOpenContact] = useState({});
+  const [modalImage, setModalImage] = useState(null);
+  // Compare hotel state
+  const [compareHotels, setCompareHotels] = useState([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
 
   // Filtering logic
   const filteredHotels = useMemo(() => {
@@ -51,15 +55,37 @@ export default function App() {
 
     // Sort by minimum room price according to sortOrder
     return filtered.sort((a, b) => {
-      const aMin = a.rooms.length > 0 ? Math.min(...a.rooms.map(r => r.price)) : Infinity;
-      const bMin = b.rooms.length > 0 ? Math.min(...b.rooms.map(r => r.price)) : Infinity;
-      if (sortOrder === "asc") {
-        return aMin - bMin;
-      } else {
-        return bMin - aMin;
+      if (sortOrder === "asc" || sortOrder === "desc") {
+        // Sort by min room price
+        const aMin = a.rooms.length > 0 ? Math.min(...a.rooms.map(r => r.price)) : Infinity;
+        const bMin = b.rooms.length > 0 ? Math.min(...b.rooms.map(r => r.price)) : Infinity;
+        return sortOrder === "asc" ? aMin - bMin : bMin - aMin;
       }
+      if (sortOrder === "alphaThAsc") {
+        return (a.nameTh || "").localeCompare(b.nameTh || "", "th");
+      }
+      if (sortOrder === "alphaThDesc") {
+        return (b.nameTh || "").localeCompare(a.nameTh || "", "th");
+      }
+      if (sortOrder === "alphaEnAsc") {
+        return (a.nameEn || "").localeCompare(b.nameEn || "", "en");
+      }
+      if (sortOrder === "alphaEnDesc") {
+        return (b.nameEn || "").localeCompare(a.nameEn || "", "en");
+      }
+      return 0;
     });
   }, [keyword, priceMin, priceMax, sortOrder]);
+
+  // Compare feature logic
+  function toggleCompareHotel(hotelId) {
+    setCompareHotels((prev) =>
+      prev.includes(hotelId)
+        ? prev.filter(id => id !== hotelId)
+        : prev.length < 3 ? [...prev, hotelId] : prev
+    );
+  }
+  const compareHotelObjects = filteredHotels.filter(h => compareHotels.includes(h.id));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -92,8 +118,12 @@ export default function App() {
             onChange={(e) => setSortOrder(e.target.value)}
             className="w-full md:w-36 border p-2 rounded-lg"
           >
-            <option value="asc">ต่ำสุด</option>
-            <option value="desc">สูงสุด</option>
+            <option value="asc">ราคาต่ำสุด</option>
+            <option value="desc">ราคาสูงสุด</option>
+            <option value="alphaThAsc">ชื่อ (ก-ฮ)</option>
+            <option value="alphaThDesc">ชื่อ (ฮ-ก)</option>
+            <option value="alphaEnAsc">Name (A-Z)</option>
+            <option value="alphaEnDesc">Name (Z-A)</option>
           </select>
           <div className="flex gap-1 ml-2">
             <button
@@ -135,6 +165,19 @@ export default function App() {
                       )}
                     </div>
                     <div className="flex flex-col flex-1 gap-1">
+                      {/* Compare checkbox */}
+                      <div className="flex items-center mb-1">
+                        <input
+                          type="checkbox"
+                          checked={compareHotels.includes(hotel.id)}
+                          onChange={() => toggleCompareHotel(hotel.id)}
+                          className="mr-2 accent-blue-600"
+                          id={`compare-${hotel.id}`}
+                        />
+                        <label htmlFor={`compare-${hotel.id}`} className="text-xs select-none cursor-pointer">
+                          เปรียบเทียบ
+                        </label>
+                      </div>
                       <div className="font-semibold text-lg">{hotel.nameTh || hotel.nameEn}</div>
                       <div className="text-xs text-gray-600 mb-2">{hotel.nameEn}</div>
                       {hotel.rooms.length > 0 ? (
@@ -245,7 +288,8 @@ export default function App() {
                                       src={img}
                                       key={img+idx}
                                       alt={room.name}
-                                      className="h-20 rounded-lg object-cover border"
+                                      className="h-20 rounded-lg object-cover border cursor-pointer"
+                                      onClick={() => setModalImage(img)}
                                     />
                                   ))}
                                 </div>
@@ -264,6 +308,79 @@ export default function App() {
           <MapView hotels={filteredHotels} />
         )}
       </div>
+      {/* Modal for enlarged room image */}
+      {modalImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+          onClick={() => setModalImage(null)}
+        >
+          <img
+            src={modalImage}
+            alt=""
+            className="max-h-[80vh] max-w-[90vw] rounded-lg shadow-lg border-4 border-white"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+      {/* Modal for hotel compare */}
+      {showCompareModal && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-3xl w-full relative">
+            <button className="absolute right-4 top-4 text-gray-400 hover:text-red-500" onClick={() => setShowCompareModal(false)}>
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <ArrowLeftRight className="w-5 h-5" /> เปรียบเทียบโรงแรม
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {compareHotelObjects.map(hotel => (
+                <div key={hotel.id} className="bg-gray-50 rounded-xl p-4 flex flex-col items-center text-center">
+                  <img src={hotel.images[0]} alt="" className="w-20 h-20 object-cover rounded-md border mb-2" />
+                  <div className="font-medium">{hotel.nameTh || hotel.nameEn}</div>
+                  <div className="text-xs text-gray-500 mb-2">{hotel.nameEn}</div>
+                  <div className="text-green-700 text-sm mb-1">
+                    ราคาเริ่มต้น {hotel.rooms.length > 0 ? Math.min(...hotel.rooms.map(r=>r.price)).toLocaleString() : "-"} ฿
+                  </div>
+                  <div className="text-xs text-gray-500 mb-1">{hotel.address}</div>
+                  <div className="text-xs text-gray-500">ห้องพัก: {hotel.rooms.length}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky compare bar */}
+      {compareHotels.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg py-2 px-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 overflow-x-auto">
+            {compareHotelObjects.map(hotel => (
+              <div key={hotel.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1 mr-1">
+                <img src={hotel.images[0]} alt="" className="w-10 h-10 object-cover rounded-md border" />
+                <span className="text-xs font-medium">{hotel.nameTh || hotel.nameEn}</span>
+                <button onClick={() => toggleCompareHotel(hotel.id)} className="text-gray-400 hover:text-red-500">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="bg-gray-200 text-gray-800 px-3 py-2 rounded-xl mr-2 font-medium hover:bg-gray-300 transition"
+              onClick={() => setCompareHotels([])}
+            >
+              รีเซ็ต
+            </button>
+            <button
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 shadow font-medium"
+              onClick={() => setShowCompareModal(true)}
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              เปรียบเทียบ ({compareHotels.length})
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
