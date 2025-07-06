@@ -381,6 +381,10 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Sticky footer */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-gray-900 text-gray-100 text-center py-2 text-xs">
+        Developed by Chongsawad Saiaram @ 2025
+      </div>
     </div>
   );
 }
