@@ -1,6 +1,9 @@
 {
-  "name": "phuket-hotels-vite-react",
+  "name": "hotel-search-app",
   "version": "0.0.1",
+  "engines": {
+    "node": "18.17.1"
+  },
   "private": true,
   "scripts": {
     "dev": "vite",
