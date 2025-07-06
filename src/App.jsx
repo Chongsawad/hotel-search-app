@@ -76,6 +76,10 @@ export default function App() {
   const [priceMinFocused, setPriceMinFocused] = useState(false);
   const [priceMaxFocused, setPriceMaxFocused] = useState(false);
 
+  // Pagination state
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+
   // Filtering logic
   const filteredHotels = useMemo(() => {
     const filtered = hotels.filter((hotel) => {
@@ -116,6 +120,12 @@ export default function App() {
       }
       return 0;
     });
+  }, [hotels, keyword, priceMin, priceMax, sortOrder]);
+
+  // Reset page to 1 when filters or sort change
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line
   }, [hotels, keyword, priceMin, priceMax, sortOrder]);
 
   // Compare feature logic
@@ -266,12 +276,30 @@ export default function App() {
         <div className="mb-2 text-sm text-gray-700">
           พบ {filteredHotels.length.toLocaleString()} โรงแรม
         </div>
+        {/* Page size selector */}
+        {view === "list" && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm">แสดง:</span>
+            <select
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+              className="border rounded p-1"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-sm">รายการต่อหน้า</span>
+          </div>
+        )}
         {view === "list" ? ( 
           <div className="grid gap-4">
             {filteredHotels.length === 0 ? (
               <div className="text-center py-10 text-gray-400">ไม่พบข้อมูลโรงแรม</div>
             ) : (
-              filteredHotels.map((hotel) => (
+              filteredHotels
+                .slice((page - 1) * pageSize, page * pageSize)
+                .map((hotel) => (
                 <div key={hotel.id} className="rounded-2xl shadow-md hover:shadow-lg bg-white">
                   <div className="flex flex-col md:flex-row gap-4 p-4">
                     <div className="md:w-40 w-full flex-shrink-0">
@@ -429,6 +457,44 @@ export default function App() {
           </div>
         ) : (
           <MapView hotels={filteredHotels} />
+        )}
+        {/* Pagination controls */}
+        {view === "list" && filteredHotels.length > 0 && (
+          <div className="flex justify-center items-center gap-2 mt-4">
+            <button
+              className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+              onClick={() => setPage(page - 1)}
+              disabled={page <= 1}
+            >
+              ก่อนหน้า
+            </button>
+            <span className="text-sm">
+              หน้า {page} / {Math.ceil(filteredHotels.length / pageSize)}
+            </span>
+            <span className="text-sm ml-2">ไปหน้า</span>
+            <input
+              type="number"
+              min={1}
+              max={Math.ceil(filteredHotels.length / pageSize)}
+              value={page}
+              onChange={e => {
+                let val = Number(e.target.value);
+                if (isNaN(val)) val = 1;
+                if (val < 1) val = 1;
+                if (val > Math.ceil(filteredHotels.length / pageSize)) val = Math.ceil(filteredHotels.length / pageSize);
+                setPage(val);
+              }}
+              className="w-14 px-1 py-1 border rounded text-center text-sm"
+              style={{marginLeft: 2, marginRight: 2}}
+            />
+            <button
+              className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+              onClick={() => setPage(page + 1)}
+              disabled={page >= Math.ceil(filteredHotels.length / pageSize)}
+            >
+              ถัดไป
+            </button>
+          </div>
         )}
       </div>
       {/* Modal for enlarged room image */}
