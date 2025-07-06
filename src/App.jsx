@@ -1,32 +1,65 @@
 // Phuket Hotels Vite React App - Entry point
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import initSqlJs from "sql.js";
 import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook, Instagram, X, ArrowLeftRight } from "lucide-react";
-import hotelData from "../phuket-hotels.json";
 
-function extractHotels(rawData) {
-  return rawData.data.data.map((hotel) => ({
-    id: hotel.id,
-    nameTh: hotel.nameTh,
-    nameEn: hotel.nameEn,
-    address: `${hotel.addressNo || ""} ${hotel.road || ""} ${hotel.district || ""} ${hotel.subDistrict || ""} ${hotel.province || ""} ${hotel.postalCode || ""}`.trim(),
-    images: hotel.images || [],
-    contact: hotel.contactMobilePhoneNo || hotel.contactEmail || "-",
-    location: hotel.location?.coordinates,
-    rooms: hotel.rooms?.map((room) => ({
-      id: room.id,
-      name: room.name,
-      price: Number(room.price),
-      images: room.images || [],
-      numberOfRoom: room.numberOfRoom,
-    })) || [],
-  }));
-}
-
-const hotels = extractHotels(hotelData);
 
 export default function App() {
+  const [SQL, setSQL] = useState(null);
+  const [db, setDb] = useState(null);
+  const [hotels, setHotels] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const SQL = await initSqlJs({
+        locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/${file}`
+      });
+
+      if (!mounted) return;
+      setSQL(SQL);
+
+      // Fetch the .sqlite file from public
+      const res = await fetch("/hotels.sqlite");
+      const buf = await res.arrayBuffer();
+      const db = new SQL.Database(new Uint8Array(buf));
+      if (!mounted) return;
+      setDb(db);
+
+      // Initial: select all hotels
+      const resHotels = db.exec("SELECT * FROM hotels");
+      console.log("query results ", resHotels.length);
+
+      const hotelsRaw = resHotels[0]?.values?.map(row => {
+        const [
+          id, nameTh, nameEn, addressNo, road, district, subDistrict, province, postalCode,
+          regionScope, contactMobilePhoneNo, contactEmail, bizContactWebsite, bizContactFacebook,
+          bizContactInstagram, contactLine, locationLat, locationLng, images, rooms
+        ] = row;
+        return {
+          id,
+          nameTh,
+          nameEn,
+          address: `${addressNo || ""} ${road || ""} ${district || ""} ${subDistrict || ""} ${province || ""} ${postalCode || ""}`.trim(),
+          images: images ? JSON.parse(images) : [],
+          contact: contactMobilePhoneNo || contactEmail || "-",
+          location: locationLat && locationLng ? [locationLng, locationLat] : null,
+          rooms: rooms ? JSON.parse(rooms) : [],
+          _full: {
+            contactMobilePhoneNo, contactEmail, bizContactWebsite, bizContactFacebook,
+            bizContactInstagram, contactLine, addressNo, road, district, subDistrict, province, postalCode
+          }
+        };
+      }) || [];
+      setHotels(hotelsRaw);
+      setLoading(false);
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const [keyword, setKeyword] = useState("");
-  const [priceMin, setPriceMin] = useState(0);
+  const [priceMin, setPriceMin] = useState(1500);
   const [priceMax, setPriceMax] = useState(200000);
   const [view, setView] = useState("list");
   const [openRooms, setOpenRooms] = useState({});
@@ -83,7 +116,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [keyword, priceMin, priceMax, sortOrder]);
+  }, [hotels, keyword, priceMin, priceMax, sortOrder]);
 
   // Compare feature logic
   function toggleCompareHotel(hotelId) {
@@ -94,6 +127,14 @@ export default function App() {
     );
   }
   const compareHotelObjects = filteredHotels.filter(h => compareHotels.includes(h.id));
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        กำลังโหลดข้อมูลโรงแรมจากฐานข้อมูล...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -292,8 +333,8 @@ export default function App() {
                       {openContact[hotel.id] && (
                         <div className="border rounded-xl bg-gray-50 p-3 mt-2 mb-2 flex flex-col gap-1">
                           {/* Contact details, show if available */}
-                          {hotelData.data.data.find(h => h.id === hotel.id) && (() => {
-                            const h = hotelData.data.data.find(h => h.id === hotel.id);
+                          {(() => {
+                            const h = hotel._full || {};
                             return (
                               <>
                                 {h.contactMobilePhoneNo && (
