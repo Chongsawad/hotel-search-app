@@ -9,6 +9,9 @@ on:
         description: 'Target environment for this workflow run'
         required: true
         default: 'Production'
+      curl_post_data:
+        description: 'POST data to send to API (leave blank to use default variable)'
+        required: false
 
 jobs:
   fetch-convert-commit:
@@ -27,8 +30,10 @@ jobs:
         run: pip install requests
 
       - name: Fetch JSON data from API
+        # Allows override of CURL_POST_DATA via manual dispatch, otherwise falls back to repo variable
         env:
           AUTH_HEADER: ${{ secrets.AUTH_HEADER }}
+          CURL_POST_DATA: ${{ github.event.inputs.curl_post_data || vars.CURL_POST_DATA }}
         run: |
           curl --insecure --request POST \
             --url https://backend-api.tat.or.th/mobile/buyer/booking/sellers \
@@ -37,7 +42,7 @@ jobs:
             --header "Authorization: ${AUTH_HEADER}" \
             --header 'Cache-Control: no-cache' \
             --header 'Content-Type: application/json' \
-            --data '{"page": 1, "limit": 99, "businessType": ["500040001"]}' \
+            --data "${CURL_POST_DATA}" \
             -o raw-data.json
 
       - name: Convert JSON to SQLite
