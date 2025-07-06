@@ -175,7 +175,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto py-6 px-2">
+      <div className="max-w-5xl mx-auto py-6 px-2 pb-24">
         {/* Name Search (always full width) */}
         <div className="w-full mb-2">
           <div className="relative">
