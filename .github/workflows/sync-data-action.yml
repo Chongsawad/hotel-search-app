@@ -45,7 +45,7 @@ jobs:
             --header 'Cache-Control: no-cache' \
             --header 'Content-Type: application/json' \
             --data "${CURL_POST_DATA}")
-          if [ "$http_code" -ne 200 ]; then
+          if [ "$http_code" -ge 300 ]; then
             echo "API returned HTTP status $http_code"
             echo "----- raw-data.json -----"
             cat raw-data.json
