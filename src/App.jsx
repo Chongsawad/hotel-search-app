@@ -3,6 +3,13 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import initSqlJs from "sql.js";
 import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook, Instagram, X, ArrowLeftRight } from "lucide-react";
 
+function getAbsoluteUrl(url) {
+  if (!url) return "";
+  url = url.trim().replace(/^\/+|\/+$/g, "");
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return "https://" + url;
+}
+
 
 export default function App() {
   const DEFAULT_FILTERS = {
@@ -459,26 +466,26 @@ export default function App() {
                                 {h.bizContactWebsite && (
                                   <div className="flex items-center gap-2 text-sm">
                                     <Globe className="w-4 h-4 text-gray-600" />
-                                    <a href={h.bizContactWebsite} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">{h.bizContactWebsite}</a>
+                                    <a href={getAbsoluteUrl(h.bizContactWebsite)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">{h.bizContactWebsite}</a>
                                   </div>
                                 )}
                                 {h.bizContactFacebook && (
                                   <div className="flex items-center gap-2 text-sm">
                                     <Facebook className="w-4 h-4 text-gray-600" />
-                                    <a href={h.bizContactFacebook} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Facebook</a>
+                                    <a href={getAbsoluteUrl(h.bizContactFacebook)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Facebook</a>
                                   </div>
                                 )}
                                 {h.contactLine && (
                                   <div className="flex items-center gap-2 text-sm">
                                     {/* No icon in lucide-react for Line, use custom svg or text */}
                                     <span className="w-4 h-4 text-gray-600 font-bold">LINE</span>
-                                    <a href={h.contactLine} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Line</a>
+                                    <a href={getAbsoluteUrl(h.contactLine)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Line</a>
                                   </div>
                                 )}
                                 {h.bizContactInstagram && (
                                   <div className="flex items-center gap-2 text-sm">
                                     <Instagram className="w-4 h-4 text-gray-600" />
-                                    <a href={h.bizContactInstagram} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Instagram</a>
+                                    <a href={getAbsoluteUrl(h.bizContactInstagram)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Instagram</a>
                                   </div>
                                 )}
                                 {/* Always show address */}
