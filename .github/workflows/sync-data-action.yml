@@ -35,15 +35,24 @@ jobs:
           AUTH_HEADER: ${{ secrets.AUTH_HEADER }}
           CURL_POST_DATA: ${{ github.event.inputs.curl_post_data || vars.CURL_POST_DATA }}
         run: |
-          curl --insecure --request POST \
+          set -e
+          http_code=$(curl --insecure --write-out "%{http_code}" --silent --output raw-data.json \
+            --request POST \
             --url https://backend-api.tat.or.th/mobile/buyer/booking/sellers \
             --header 'Accept-Encoding: gzip, deflate, br' \
             --header 'Accept-Language: en-GB,en-US;q=0.9,en;q=0.8' \
             --header "Authorization: ${AUTH_HEADER}" \
             --header 'Cache-Control: no-cache' \
             --header 'Content-Type: application/json' \
-            --data "${CURL_POST_DATA}" \
-            -o raw-data.json
+            --data "${CURL_POST_DATA}")
+          if [ "$http_code" -ne 200 ]; then
+            echo "API returned HTTP status $http_code"
+            echo "----- raw-data.json -----"
+            cat raw-data.json
+            echo "----- Request payload -----"
+            echo "${CURL_POST_DATA}"
+            exit 1
+          fi
 
       - name: Convert JSON to SQLite
         run: |
