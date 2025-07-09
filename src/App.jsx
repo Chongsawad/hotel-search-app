@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import initSqlJs from "sql.js";
 import { MapPin, ChevronDown, ChevronUp, List, Map, Phone, Mail, Globe, Facebook, Instagram, X, ArrowLeftRight } from "lucide-react";
+import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from "@react-google-maps/api";
 
 function getAbsoluteUrl(url) {
   if (!url) return "";
@@ -378,6 +379,21 @@ export default function App() {
             <span className="text-sm">รายการต่อหน้า</span>
           </div>
         )}
+        {/* Map/List Switch Buttons */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            className={`px-4 py-2 rounded-xl border ${view === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+            onClick={() => setView("list")}
+          >
+            <List className="inline-block w-4 h-4 mr-1" /> ตาราง
+          </button>
+          <button
+            className={`px-4 py-2 rounded-xl border ${view === "map" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+            onClick={() => setView("map")}
+          >
+            <Map className="inline-block w-4 h-4 mr-1" /> แผนที่
+          </button>
+        </div>
         {view === "list" ? ( 
           <div className="grid gap-4">
             {filteredHotels.length === 0 ? (
@@ -542,7 +558,7 @@ export default function App() {
             )}
           </div>
         ) : (
-          <MapView hotels={filteredHotels} />
+          <MapView hotels={filteredHotels} setModalImage={setModalImage} />
         )}
         {/* Pagination controls */}
         {view === "list" && filteredHotels.length > 0 && (
@@ -664,11 +680,242 @@ export default function App() {
   );
 }
 
-// Simple map view using Leaflet (placeholder)
-function MapView({ hotels }) {
+// Responsive height: fills screen below filters, above footer
+const mapContainerStyle = {
+  width: "100%",
+  height: "calc(100vh - 210px)",
+  borderRadius: "1rem"
+};
+const defaultCenter = { lat: 7.8804, lng: 98.3923 }; // Phuket center
+
+function MapView({ hotels, setModalImage }) {
+  // For Vite, use import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  });
+
+  const [selected, setSelected] = React.useState(null);
+  const [showFloating, setShowFloating] = React.useState(false);
+  // Drag state for floating panel
+  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = React.useState(false);
+  const dragOrigin = React.useRef({ x: 0, y: 0 });
+
+  // Only consider hotels with valid location
+  const locHotels = hotels.filter(h => h.location && h.location[1] && h.location[0]);
+
+  // Center state and logic
+  // Determine defaultCenter based on locHotels
+  const computedDefaultCenter = locHotels.length > 0
+    ? { lat: locHotels[0].location[1], lng: locHotels[0].location[0] }
+    : defaultCenter;
+  const [center, setCenter] = React.useState(computedDefaultCenter);
+
+  // When hotels data changes, reset center to default
+  React.useEffect(() => {
+    setCenter(
+      locHotels.length > 0
+        ? { lat: locHotels[0].location[1], lng: locHotels[0].location[0] }
+        : defaultCenter
+    );
+    // Also clear selection and floating panel
+    setSelected(null);
+    setShowFloating(false);
+    // Do NOT reset dragOffset here
+    // eslint-disable-next-line
+  }, [hotels]);
+
+  // Debug: Print out hotel locations used for markers
+  console.log("locHotels for map", locHotels);
+  if (locHotels.length === 0) {
+    return <div>ไม่มีโรงแรมที่มีข้อมูลพิกัด (No hotel has geolocation)</div>;
+  }
+
+  if (!isLoaded) return <div>Loading Map...</div>;
+
+  // Helper for contact details in InfoWindow
+  function renderContactDetails(hotel) {
+    const h = hotel._full || {};
+    return (
+      <div className="mt-1 text-xs text-gray-500 space-y-1">
+        {h.contactMobilePhoneNo && (
+          <div className="flex items-center gap-1">
+            <Phone className="inline-block w-3 h-3 text-gray-500" />
+            <span>{h.contactMobilePhoneNo}</span>
+          </div>
+        )}
+        {h.contactEmail && (
+          <div className="flex items-center gap-1">
+            <Mail className="inline-block w-3 h-3 text-gray-500" />
+            <span>{h.contactEmail}</span>
+          </div>
+        )}
+        {h.bizContactWebsite && (
+          <div className="flex items-center gap-1">
+            <Globe className="inline-block w-3 h-3 text-gray-500" />
+            <a href={getAbsoluteUrl(h.bizContactWebsite)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Website</a>
+          </div>
+        )}
+        {h.bizContactFacebook && (
+          <div className="flex items-center gap-1">
+            <Facebook className="inline-block w-3 h-3 text-gray-500" />
+            <a href={getAbsoluteUrl(h.bizContactFacebook)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Facebook</a>
+          </div>
+        )}
+        {h.bizContactInstagram && (
+          <div className="flex items-center gap-1">
+            <Instagram className="inline-block w-3 h-3 text-gray-500" />
+            <a href={getAbsoluteUrl(h.bizContactInstagram)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Instagram</a>
+          </div>
+        )}
+        {h.contactLine && (
+          <div className="flex items-center gap-1">
+            <span className="inline-block w-3 h-3 text-gray-500 font-bold">LINE</span>
+            <a href={getAbsoluteUrl(h.contactLine)} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">Line</a>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="h-96 w-full rounded-2xl bg-gray-200 flex items-center justify-center">
-      <span className="text-gray-500">(Map view is not implemented in this preview, but should plot {hotels.length} hotels by coordinates.)</span>
+    <div
+      className="relative"
+      style={{ width: "100%", height: "100%" }}
+      onMouseMove={e => {
+        if (dragging) {
+          setDragOffset({
+            x: e.clientX - dragOrigin.current.x,
+            y: e.clientY - dragOrigin.current.y
+          });
+        }
+      }}
+      onMouseUp={() => setDragging(false)}
+      onMouseLeave={() => setDragging(false)}
+    >
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={center}
+        zoom={14}
+      >
+        {locHotels.map(hotel => (
+          <Marker
+            key={hotel.id}
+            position={{ lat: hotel.location[1], lng: hotel.location[0] }}
+            onClick={() => {
+              setSelected(hotel);
+              setCenter({ lat: hotel.location[1], lng: hotel.location[0] });
+            }}
+          />
+        ))}
+        {selected && (
+          <InfoWindow
+            position={{ lat: selected.location[1], lng: selected.location[0] }}
+            onCloseClick={() => {
+              setSelected(null);
+              setShowFloating(false);
+              // Do NOT reset dragOffset here
+            }}
+          >
+            <div>
+              <strong>{selected.nameTh || selected.nameEn}</strong>
+              <div>
+                ราคาเริ่มต้น {selected.rooms.length > 0 ? Math.min(...selected.rooms.map(r => r.price)).toLocaleString() : "-"} ฿
+              </div>
+              {/* Contact details below price, small/gray */}
+              {renderContactDetails(selected)}
+              <button
+                className="mt-2 bg-blue-600 text-white rounded px-2 py-1 text-xs"
+                onClick={() => setShowFloating(true)}
+              >
+                ดูรายละเอียดเพิ่มเติม
+              </button>
+            </div>
+          </InfoWindow>
+        )}
+      </GoogleMap>
+      {selected && showFloating && (
+        <div
+          className="absolute right-4 top-8 z-[1000] bg-white rounded-2xl shadow-lg p-5 w-full max-w-md border"
+          style={{
+            maxHeight: "80vh",
+            overflowY: "auto",
+            transform: dragging ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` : undefined
+          }}
+        >
+          <button
+            onClick={() => {
+              setSelected(null);
+              setShowFloating(false);
+              setDragOffset({ x: 0, y: 0 });
+            }}
+            className="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-2xl leading-none"
+          >×</button>
+          {/* Drag handle header */}
+          <div
+            className="cursor-move font-semibold text-base pb-1 mb-2 border-b"
+            style={{ userSelect: "none" }}
+            onMouseDown={e => {
+              setDragging(true);
+              dragOrigin.current = {
+                x: e.clientX - dragOffset.x,
+                y: e.clientY - dragOffset.y
+              };
+            }}
+          >
+            {selected.nameTh || selected.nameEn}
+          </div>
+          <div>
+            <div className="text-xs text-gray-600 mb-2">{selected.nameEn}</div>
+            {selected.rooms.length > 0 && (
+              <div className="text-sm text-green-700 mb-1">
+                ราคาเริ่มต้น {Math.min(...selected.rooms.map(r => r.price)).toLocaleString()} ฿
+              </div>
+            )}
+            <div className="flex items-center gap-1 text-sm text-gray-700 mb-1">
+              <MapPin className="w-4 h-4 text-gray-500" />
+              <span>{selected.address}</span>
+              {selected.location ? (
+                <a
+                  href={`https://www.google.com/maps?q=${selected.location[1]},${selected.location[0]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 underline text-blue-600 text-xs"
+                >
+                  Google Maps
+                </a>
+              ) : null}
+            </div>
+            <div className="text-xs text-gray-500 mb-1">ติดต่อ: {selected.contact}</div>
+            <div className="grid gap-2 mt-2">
+              {selected.rooms.length === 0 ? (
+                <div className="text-gray-400 text-sm">ไม่มีข้อมูลห้องพัก</div>
+              ) : (
+                selected.rooms.map((room) => (
+                  <div key={room.id} className="p-2 border rounded-xl bg-gray-50">
+                    <div className="font-medium text-base">{room.name}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm text-gray-700">ราคา: <span className="font-bold">{room.price?.toLocaleString()} ฿</span></div>
+                      <div className="text-xs text-gray-500">ห้อง: {room.numberOfRoom}</div>
+                    </div>
+                    <div className="flex gap-2 mt-1 overflow-x-auto">
+                      {room.images.map((img, idx) => (
+                        <img
+                          src={img}
+                          key={img+idx}
+                          alt={room.name}
+                          className="h-16 rounded-lg object-cover border cursor-pointer"
+                          onClick={() => setModalImage(img)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
