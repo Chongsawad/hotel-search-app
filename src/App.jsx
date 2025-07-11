@@ -19,7 +19,8 @@ export default function App() {
     province: "",
     priceMin: 1500,
     priceMax: 20000,
-    sortOrder: "asc"
+    sortOrder: "asc",
+    filterMode: "hotel"
   };
   const [SQL, setSQL] = useState(null);
   const [db, setDb] = useState(null);
@@ -89,8 +90,8 @@ export default function App() {
   // Compare hotel state
   const [compareHotels, setCompareHotels] = useState([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
-  // Enable/disable price filter
-  const [enablePriceFilter, setEnablePriceFilter] = useState(true);
+  // Filter mode: "hotel", "other", "all"
+  const [filterMode, setFilterMode] = useState(DEFAULT_FILTERS.filterMode);
 
   const keywordInputRef = useRef(null);
   const priceMinInputRef = useRef(null);
@@ -126,17 +127,23 @@ export default function App() {
         hotel.nameTh?.includes(keyword) ||
         hotel.nameEn?.toLowerCase().includes(keyword.toLowerCase());
 
-      let priceMatch = true;
-      if (enablePriceFilter) {
-        const minRoomPrice = hotel.rooms.length > 0
-          ? Math.min(...hotel.rooms.map(r => r.price))
-          : Infinity;
+      // Filter by mode
+      if (filterMode === "hotel") {
+        // Only items with rooms
+        if (!hotel.rooms || hotel.rooms.length === 0) return false;
+        // Price filter applies only in hotel mode
+        const minRoomPrice = Math.min(...hotel.rooms.map(r => r.price));
         const minOK = priceMin === "" ? true : minRoomPrice >= priceMin;
         const maxOK = priceMax === "" ? true : minRoomPrice <= priceMax;
-        priceMatch = minOK && maxOK;
+        if (!(minOK && maxOK)) return false;
+      } else if (filterMode === "other") {
+        // Only items without rooms
+        if (hotel.rooms && hotel.rooms.length > 0) return false;
+      } else if (filterMode === "all") {
+        // Show all items, no price filter
+        // nothing to do
       }
-
-      return hotelMatch && priceMatch;
+      return hotelMatch;
     });
 
     // Sort by minimum room price according to sortOrder
@@ -161,7 +168,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter, enablePriceFilter]);
+  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter, filterMode]);
 
   // Reset page to 1 when filters or sort change, including region/province
   useEffect(() => {
@@ -348,6 +355,7 @@ export default function App() {
                 setPriceMin(DEFAULT_FILTERS.priceMin);
                 setPriceMax(DEFAULT_FILTERS.priceMax);
                 setSortOrder(DEFAULT_FILTERS.sortOrder);
+                setFilterMode(DEFAULT_FILTERS.filterMode);
               }}
             >
               รีเซ็ตตัวกรอง
@@ -355,13 +363,18 @@ export default function App() {
           </div>
         </div>
 
-        {/* Price filter toggle and info (moved below all filters) */}
-        <PriceFilterToggleSection
-          enablePriceFilter={enablePriceFilter}
-          setEnablePriceFilter={setEnablePriceFilter}
+        {/* Filter mode segmented control */}
+        <FilterModeSegmented
+          filterMode={filterMode}
+          setFilterMode={setFilterMode}
         />
         <div className="mb-2 text-sm text-gray-700">
-          พบ {filteredHotels.length.toLocaleString()} โรงแรม
+          {filterMode === "hotel"
+            ? <>พบ {filteredHotels.length.toLocaleString()} โรงแรม</>
+            : filterMode === "other"
+              ? <>พบ {filteredHotels.length.toLocaleString()} ธุรกิจอื่น</>
+              : <>พบ {filteredHotels.length.toLocaleString()} ทั้งหมด</>
+          }
         </div>
         {/* Page size selector */}
         {view === "list" && (
@@ -818,6 +831,14 @@ function MapView({ hotels, setModalImage }) {
             }}
           >
             <div>
+              {selected.images && selected.images[0] && (
+                <img
+                  src={selected.images[0]}
+                  alt={selected.nameTh || selected.nameEn}
+                  className="w-40 h-32 object-cover rounded-lg mb-2 cursor-pointer"
+                  onClick={() => setModalImage(selected.images[0])}
+                />
+              )}
               <strong>{selected.nameTh || selected.nameEn}</strong>
               <div>
                 ราคาเริ่มต้น {selected.rooms.length > 0 ? Math.min(...selected.rooms.map(r => r.price)).toLocaleString() : "-"} ฿
@@ -919,21 +940,35 @@ function MapView({ hotels, setModalImage }) {
     </div>
   );
 }
-// Price filter section with expand/collapse UI
-function PriceFilterToggleSection({ enablePriceFilter, setEnablePriceFilter }) {
+// Segmented button for filter mode: hotel, other, all
+function FilterModeSegmented({ filterMode, setFilterMode }) {
   const [expanded, setExpanded] = React.useState(false);
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2">
-        <label className="inline-flex items-center cursor-pointer text-xs">
-          <input
-            type="checkbox"
-            checked={enablePriceFilter}
-            onChange={() => setEnablePriceFilter(v => !v)}
-            className="mr-1"
-          />
-          ใช้ตัวกรองราคา
-        </label>
+        <div className="flex items-center gap-0 mt-2">
+          <button
+            className={`px-4 py-2 rounded-l-xl border border-r-0 ${filterMode === "all" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+            onClick={() => setFilterMode("all")}
+            type="button"
+          >
+            ทั้งหมด (All)
+          </button>
+          <button
+            className={`px-4 py-2 border border-l-0 border-r-0 ${filterMode === "hotel" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+            onClick={() => setFilterMode("hotel")}
+            type="button"
+          >
+            โรงแรม (Hotels)
+          </button>
+          <button
+            className={`px-4 py-2 rounded-r-xl border border-l-0 ${filterMode === "other" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+            onClick={() => setFilterMode("other")}
+            type="button"
+          >
+            ธุรกิจอื่น (Others)
+          </button>
+        </div>
         <button
           type="button"
           className="ml-2 flex items-center text-blue-600 text-xs"
@@ -946,10 +981,14 @@ function PriceFilterToggleSection({ enablePriceFilter, setEnablePriceFilter }) {
       </div>
       <div className="mt-1 text-xs text-gray-600">
         {!expanded ? (
-          <span>ตัวเลือกนี้ใช้กรองราคา (เฉพาะธุรกิจที่มีราคาห้องพัก เช่น โรงแรม)</span>
+          <span>
+            เลือกประเภทที่ต้องการแสดง: โรงแรมที่มีห้องพัก, ธุรกิจอื่น หรือทั้งหมด
+          </span>
         ) : (
           <span>
-            ตัวเลือกนี้จะใช้ตัวกรองราคาห้องพัก ซึ่งเหมาะสำหรับโรงแรมหรือที่พักที่มีข้อมูลราคาห้องพักเท่านั้น สำหรับธุรกิจประเภทอื่น เช่น ร้านอาหาร สปา รถเช่า ฯลฯ จะไม่มีราคาห้องพักให้กรอง จึงควรปิดการใช้ตัวกรองราคาหากต้องการค้นหาทุกธุรกิจ
+            <b>โรงแรม (Hotels):</b> แสดงเฉพาะโรงแรมหรือที่พักที่มีข้อมูลห้องพักและราคาห้องพัก (พร้อมตัวกรองราคา)<br />
+            <b>ธุรกิจอื่น (Others):</b> แสดงเฉพาะธุรกิจที่ไม่มีข้อมูลห้องพัก เช่น ร้านอาหาร สปา รถเช่า ฯลฯ<br />
+            <b>ทั้งหมด (All):</b> แสดงทุกธุรกิจโดยไม่แยกประเภท (ไม่มีตัวกรองราคา)
           </span>
         )}
       </div>
