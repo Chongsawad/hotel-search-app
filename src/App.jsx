@@ -86,6 +86,7 @@ export default function App() {
   const [openRooms, setOpenRooms] = useState({});
   const [sortOrder, setSortOrder] = useState(DEFAULT_FILTERS.sortOrder);
   const [openContact, setOpenContact] = useState({});
+  const [openGallery, setOpenGallery] = useState({});
   const [modalImage, setModalImage] = useState(null);
   // Compare hotel state
   const [compareHotels, setCompareHotels] = useState([]);
@@ -419,11 +420,37 @@ export default function App() {
                   <div className="flex flex-col md:flex-row gap-4 p-4">
                     <div className="md:w-40 w-full flex-shrink-0">
                       {hotel.images[0] ? (
-                        <img
-                          src={hotel.images[0]}
-                          alt={hotel.nameTh}
-                          className="rounded-xl object-cover w-full h-28 md:h-36"
-                        />
+                        <>
+                          <img
+                            src={hotel.images[0]}
+                            alt={hotel.nameTh}
+                            className="rounded-xl object-cover w-full h-28 md:h-36"
+                          />
+                          {hotel.images.length > 1 && (
+                            <button
+                              className="mt-1 w-fit flex items-center border rounded-xl px-3 py-1 text-xs"
+                              onClick={() => setOpenGallery(s => ({ ...s, [hotel.id]: !s[hotel.id] }))}
+                            >
+                              {openGallery[hotel.id] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              <span className="ml-1">
+                                {openGallery[hotel.id] ? "ซ่อนรูปทั้งหมด" : `ดูรูปทั้งหมด (${hotel.images.length})`}
+                              </span>
+                            </button>
+                          )}
+                          {openGallery[hotel.id] && (
+                            <div className="flex gap-2 mt-2 overflow-x-auto">
+                              {hotel.images.map((img, idx) => (
+                                <img
+                                  src={img}
+                                  key={img+idx}
+                                  alt={hotel.nameTh || hotel.nameEn}
+                                  className="h-20 rounded-lg object-cover border cursor-pointer"
+                                  onClick={() => setModalImage(img)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div className="rounded-xl bg-gray-200 w-full h-28 md:h-36 flex items-center justify-center text-gray-400 text-xs">
                           ไม่มีรูป
@@ -529,40 +556,44 @@ export default function App() {
                           })()}
                         </div>
                       )}
-                      <button
-                        className="mt-3 w-fit flex items-center border rounded-xl px-3 py-1 text-sm"
-                        onClick={() => setOpenRooms((s) => ({ ...s, [hotel.id]: !s[hotel.id] }))}
-                      >
-                        {openRooms[hotel.id] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        <span className="ml-1">{openRooms[hotel.id] ? "ซ่อนห้องพัก" : `ดูห้องพัก (${hotel.rooms.length})`}</span>
-                      </button>
-                      {openRooms[hotel.id] && (
-                        <div className="grid gap-2 mt-3">
-                          {hotel.rooms.length === 0 ? (
-                            <div className="text-gray-400 text-sm">ไม่มีข้อมูลห้องพัก</div>
-                          ) : (
-                            hotel.rooms.map((room) => (
-                              <div key={room.id} className="p-2 border rounded-xl bg-gray-50">
-                                <div className="font-medium text-base">{room.name}</div>
-                                <div className="flex items-center gap-3">
-                                  <div className="text-sm text-gray-700">ราคา: <span className="font-bold">{room.price?.toLocaleString()} ฿</span></div>
-                                  <div className="text-xs text-gray-500">ห้อง: {room.numberOfRoom}</div>
-                                </div>
-                                <div className="flex gap-2 mt-1 overflow-x-auto">
-                                  {room.images.map((img, idx) => (
-                                    <img
-                                      src={img}
-                                      key={img+idx}
-                                      alt={room.name}
-                                      className="h-20 rounded-lg object-cover border cursor-pointer"
-                                      onClick={() => setModalImage(img)}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            ))
+                      {filterMode !== "other" && (
+                        <>
+                          <button
+                            className="mt-3 w-fit flex items-center border rounded-xl px-3 py-1 text-sm"
+                            onClick={() => setOpenRooms((s) => ({ ...s, [hotel.id]: !s[hotel.id] }))}
+                          >
+                            {openRooms[hotel.id] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            <span className="ml-1">{openRooms[hotel.id] ? "ซ่อนห้องพัก" : `ดูห้องพัก (${hotel.rooms.length})`}</span>
+                          </button>
+                          {openRooms[hotel.id] && (
+                            <div className="grid gap-2 mt-3">
+                              {hotel.rooms.length === 0 ? (
+                                <div className="text-gray-400 text-sm">ไม่มีข้อมูลห้องพัก</div>
+                              ) : (
+                                hotel.rooms.map((room) => (
+                                  <div key={room.id} className="p-2 border rounded-xl bg-gray-50">
+                                    <div className="font-medium text-base">{room.name}</div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="text-sm text-gray-700">ราคา: <span className="font-bold">{room.price?.toLocaleString()} ฿</span></div>
+                                      <div className="text-xs text-gray-500">ห้อง: {room.numberOfRoom}</div>
+                                    </div>
+                                    <div className="flex gap-2 mt-1 overflow-x-auto">
+                                      {room.images.map((img, idx) => (
+                                        <img
+                                          src={img}
+                                          key={img+idx}
+                                          alt={room.name}
+                                          className="h-20 rounded-lg object-cover border cursor-pointer"
+                                          onClick={() => setModalImage(img)}
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
                           )}
-                        </div>
+                        </>
                       )}
                     </div>
                   </div>
