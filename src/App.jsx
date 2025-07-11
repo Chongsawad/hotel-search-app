@@ -108,6 +108,10 @@ export default function App() {
   // Filter mode: "hotel", "other", "all"
   const [filterMode, setFilterMode] = useState(DEFAULT_FILTERS.filterMode);
 
+  // Sticky filter bar ref and height for map view
+  const stickyBarRef = useRef(null);
+  const [stickyBarHeight, setStickyBarHeight] = useState(0);
+
   const keywordInputRef = useRef(null);
   const priceMinInputRef = useRef(null);
   const priceMaxInputRef = useRef(null);
@@ -221,6 +225,14 @@ export default function App() {
     // eslint-disable-next-line
   }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter]);
 
+  // Effect: measure sticky bar height when map view active
+  useEffect(() => {
+    if (view === "map" && stickyBarRef.current) {
+      setStickyBarHeight(stickyBarRef.current.offsetHeight);
+    }
+    // Optionally: could debounce or adjust for window resize, but basic version
+  }, [view, filterMode, keyword, provinceFilter]);
+
   // Compare feature logic
   function toggleCompareHotel(hotelId) {
     setCompareHotels((prev) =>
@@ -241,250 +253,337 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto py-6 px-2 pb-24">
-        {/* Name Search (always full width) */}
-        <div className="w-full mb-2">
-          <div className="relative">
-            <input
-              placeholder="ค้นหาโรงแรม หรือ Hotel Name..."
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="w-full border p-2 rounded-lg pr-8"
-              ref={keywordInputRef}
-              onKeyDown={e => { if (e.key === "Enter") { keywordInputRef.current && keywordInputRef.current.blur(); } }}
-            />
-            {keyword !== "" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setKeyword("");
-                  keywordInputRef.current && keywordInputRef.current.focus();
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                tabIndex={-1}
-                aria-label="Clear"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </div>
-        {/* Main Filter Controls Bar */}
-        <div className="flex gap-2 w-full items-center overflow-x-auto scrollbar-hide py-1">
-          {/* Region filter */}
-          <div className="flex-1 min-w-0">
-            <select
-              value={regionFilter}
-              onChange={e => setRegionFilter(e.target.value)}
-              className="w-full border p-2 rounded-lg"
-            >
-              <option value="">ทุกภาค (All regions)</option>
-              {regions.map(region => (
-                <option value={region} key={region}>{region}</option>
-              ))}
-            </select>
-          </div>
-          {/* Province filter */}
-          <div className="flex-1 min-w-0">
-            <input
-              className="w-full border p-2 rounded-lg"
-              placeholder="ค้นหาจังหวัด (Province)..."
-              value={provinceFilter}
-              onChange={e => {
-                setProvinceFilter(e.target.value);
-                const v = e.target.value;
-                if (provinces.includes(v)) {
-                  provinceInputRef.current && provinceInputRef.current.blur();
-                }
-              }}
-              list="province-list"
-              ref={provinceInputRef}
-            />
-            <datalist id="province-list">
-              {provinces.map(prov => (
-                <option value={prov} key={prov}>{prov}</option>
-              ))}
-            </datalist>
-          </div>
-        </div>
-        <div className="flex gap-2 w-full items-center overflow-x-auto scrollbar-hide py-1">
-          {/* Min Price */}
-          <div className="flex-1 min-w-0 relative">
-            <input
-              type="number"
-              min={0}
-              placeholder="ราคาขั้นต่ำ (Min THB)"
-              value={priceMinFocused && priceMin === 0 ? "" : (priceMin || "")}
-              onFocus={() => {
-                setPriceMinFocused(true);
-                if (priceMin === 0) setPriceMin("");
-              }}
-              onBlur={() => {
-                setPriceMinFocused(false);
-                if (priceMin === "" || isNaN(priceMin)) setPriceMin(0);
-              }}
-              onChange={e => setPriceMin(e.target.value === "" ? "" : Number(e.target.value))}
-              className="border p-2 rounded-lg w-full pr-8"
-              ref={priceMinInputRef}
-              onKeyDown={e => { if (e.key === "Enter") { priceMinInputRef.current && priceMinInputRef.current.blur(); } }}
-            />
-            {priceMin !== "" && priceMin !== 0 && (
-              <button
-                type="button"
-                onClick={() => setPriceMin("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                tabIndex={-1}
-                aria-label="Clear"
-              >
-                ×
-              </button>
-            )}
-          </div>
-          {/* Max Price */}
-          <div className="flex-1 min-w-0 relative">
-            <input
-              type="number"
-              min={0}
-              placeholder="ราคาสูงสุด (Max THB)"
-              value={priceMaxFocused && priceMax === 0 ? "" : (priceMax || "")}
-              onFocus={() => {
-                setPriceMaxFocused(true);
-                if (priceMax === 0) setPriceMax("");
-              }}
-              onBlur={() => {
-                setPriceMaxFocused(false);
-                if (priceMax === "" || isNaN(priceMax)) setPriceMax(0);
-              }}
-              onChange={e => setPriceMax(e.target.value === "" ? "" : Number(e.target.value))}
-              className="border p-2 rounded-lg w-full pr-8"
-              ref={priceMaxInputRef}
-              onKeyDown={e => { if (e.key === "Enter") { priceMaxInputRef.current && priceMaxInputRef.current.blur(); } }}
-            />
-            {priceMax !== "" && priceMax !== 0 && (
-              <button
-                type="button"
-                onClick={() => setPriceMax("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                tabIndex={-1}
-                aria-label="Clear"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2 w-full mb-4 items-center overflow-x-auto scrollbar-hide py-1">
-          {/* Sort Order */}
-          <div className="flex-1 min-w-0">
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              className="w-full border p-2 rounded-lg"
-            >
-              <option value="asc">ราคาต่ำสุด</option>
-              <option value="desc">ราคาสูงสุด</option>
-              <option value="alphaThAsc">ชื่อ (ก-ฮ)</option>
-              <option value="alphaThDesc">ชื่อ (ฮ-ก)</option>
-              <option value="alphaEnAsc">Name (A-Z)</option>
-              <option value="alphaEnDesc">Name (Z-A)</option>
-              <option value="distance">ระยะทาง (ใกล้สุด)</option>
-            </select>
-            {/* Reference location picker - only show if sorting by distance */}
-            {sortOrder === "distance" && (
-              <>
-                <div className="mt-2">
-                  <div className="font-medium text-sm mb-1">เลือกตำแหน่งอ้างอิง:</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="border px-3 py-1 rounded-xl bg-white hover:bg-gray-100 text-sm"
-                      onClick={() => setShowRefMap(true)}
-                    >
-                      {referenceLocation ? "เปลี่ยนตำแหน่งอ้างอิง" : "เลือกตำแหน่งอ้างอิงบนแผนที่"}
-                    </button>
-                    {referenceLocation && (
-                      <span className="text-xs text-gray-700">
-                        พิกัด: {referenceLocation.lat.toFixed(5)}, {referenceLocation.lng.toFixed(5)}
-                        <button
-                          className="ml-2 text-gray-400 hover:text-red-500"
-                          title="ลบตำแหน่งอ้างอิง"
-                          onClick={() => setReferenceLocation(null)}
-                        >×</button>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {sortOrder === "distance" && !referenceLocation && (
-                  <div className="mt-2 px-3 py-2 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm rounded-xl flex items-center gap-2">
-                    <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /></svg>
-                    กรุณาเลือกตำแหน่งอ้างอิงบนแผนที่ก่อนใช้งานการเรียงลำดับระยะทาง
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          {/* Reset Filters Button (styled like List button) */}
-          <div className="flex-shrink-0">
+      {/* Sticky map bar for map view */}
+      {view === "map" && (
+        <>
+          <div
+            className="fixed top-0 left-0 right-0 z-40 bg-white shadow-xl items-center gap-2 px-2 py-2 border-b"
+            ref={stickyBarRef}
+          >
             <button
-              className="bg-white border border-gray-300 text-black rounded-xl hover:bg-gray-100 transition rounded-xl px-3 py-2"
-              onClick={() => {
-                setKeyword(DEFAULT_FILTERS.keyword);
-                setRegionFilter(DEFAULT_FILTERS.region);
-                setProvinceFilter(DEFAULT_FILTERS.province);
-                setPriceMin(DEFAULT_FILTERS.priceMin);
-                setPriceMax(DEFAULT_FILTERS.priceMax);
-                setSortOrder(DEFAULT_FILTERS.sortOrder);
-                setFilterMode(DEFAULT_FILTERS.filterMode);
-              }}
+              className="px-3 py-2 rounded-xl border bg-blue-600 text-white flex items-center gap-1"
+              onClick={() => setView("list")}
             >
-              รีเซ็ตตัวกรอง
+              <List className="inline-block w-4 h-4 mr-1" /> กลับตาราง
             </button>
+            {/* Minimal search box */}
+            <div className="flex-1 min-w-0">
+              <div className="relative">
+                <input
+                  placeholder="ค้นหาโรงแรม หรือ Hotel Name..."
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className="w-full border p-2 rounded-lg pr-8"
+                  ref={keywordInputRef}
+                  style={{ minWidth: 120 }}
+                  onKeyDown={e => { if (e.key === "Enter") { keywordInputRef.current && keywordInputRef.current.blur(); } }}
+                />
+                {keyword !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKeyword("");
+                      keywordInputRef.current && keywordInputRef.current.focus();
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    tabIndex={-1}
+                    aria-label="Clear"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+            {/* Minimal filter mode segmented button - moved after search input */}
+            <div className="flex-shrink-0">
+              <FilterModeSegmented filterMode={filterMode} setFilterMode={setFilterMode} />
+            </div>
+            {/* Result count - moved after filter mode segmented */}
+            <div className="text-xs text-gray-700 flex-shrink-0 ml-2">
+              {filterMode === "hotel"
+                ? <>พบ {filteredHotels.length.toLocaleString()} โรงแรม</>
+                : filterMode === "other"
+                  ? <>พบ {filteredHotels.length.toLocaleString()} ธุรกิจอื่น</>
+                  : <>พบ {filteredHotels.length.toLocaleString()} ทั้งหมด</>
+              }
+            </div>
+            {/* Optionally: province filter, but minimal */}
+            <div className="flex-shrink-0" style={{ minWidth: 200 }}>
+              <input
+                className="border p-2 rounded-lg w-full"
+                placeholder="จังหวัด"
+                value={provinceFilter}
+                onChange={e => setProvinceFilter(e.target.value)}
+                list="province-list"
+                ref={provinceInputRef}
+                style={{ minWidth: 70, fontSize: "0.9em" }}
+              />
+              <datalist id="province-list">
+                {provinces.map(prov => (
+                  <option value={prov} key={prov}>{prov}</option>
+                ))}
+              </datalist>
+            </div>
           </div>
-        </div>
+          {/* Spacer for sticky bar */}
+          {/* <div style={{ height: 200 }} /> */}
+          {/* Optionally, can use <div style={{ height: stickyBarHeight }} /> if needed for layout */}
+        </>
+      )}
+      <div
+        className={view === "map"
+          ? "w-full py-6 px-0 pb-24"
+          : "max-w-5xl mx-auto py-6 px-2 pb-24"}
+        style={{ marginBottom: undefined }}
+      >
+        {/* Controls for "map" view: sticky bar moved outside, so nothing here in map view */}
+        {view === "map" ? null : (
+          <>
+            {/* Name Search (always full width) */}
+            <div className="w-full mb-2">
+              <div className="relative">
+                <input
+                  placeholder="ค้นหาโรงแรม หรือ Hotel Name..."
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className="w-full border p-2 rounded-lg pr-8"
+                  ref={keywordInputRef}
+                  onKeyDown={e => { if (e.key === "Enter") { keywordInputRef.current && keywordInputRef.current.blur(); } }}
+                />
+                {keyword !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKeyword("");
+                      keywordInputRef.current && keywordInputRef.current.focus();
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    tabIndex={-1}
+                    aria-label="Clear"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+            {/* Main Filter Controls Bar */}
+            <div className="flex gap-2 w-full items-center overflow-x-auto scrollbar-hide py-1">
+              {/* Region filter */}
+              <div className="flex-1 min-w-0">
+                <select
+                  value={regionFilter}
+                  onChange={e => setRegionFilter(e.target.value)}
+                  className="w-full border p-2 rounded-lg"
+                >
+                  <option value="">ทุกภาค (All regions)</option>
+                  {regions.map(region => (
+                    <option value={region} key={region}>{region}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Province filter */}
+              <div className="flex-1 min-w-0">
+                <input
+                  className="w-full border p-2 rounded-lg"
+                  placeholder="ค้นหาจังหวัด (Province)..."
+                  value={provinceFilter}
+                  onChange={e => {
+                    setProvinceFilter(e.target.value);
+                    const v = e.target.value;
+                    if (provinces.includes(v)) {
+                      provinceInputRef.current && provinceInputRef.current.blur();
+                    }
+                  }}
+                  list="province-list"
+                  ref={provinceInputRef}
+                />
+                <datalist id="province-list">
+                  {provinces.map(prov => (
+                    <option value={prov} key={prov}>{prov}</option>
+                  ))}
+                </datalist>
+              </div>
+            </div>
+            <div className="flex gap-2 w-full items-center overflow-x-auto scrollbar-hide py-1">
+              {/* Min Price */}
+              <div className="flex-1 min-w-0 relative">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ราคาขั้นต่ำ (Min THB)"
+                  value={priceMinFocused && priceMin === 0 ? "" : (priceMin || "")}
+                  onFocus={() => {
+                    setPriceMinFocused(true);
+                    if (priceMin === 0) setPriceMin("");
+                  }}
+                  onBlur={() => {
+                    setPriceMinFocused(false);
+                    if (priceMin === "" || isNaN(priceMin)) setPriceMin(0);
+                  }}
+                  onChange={e => setPriceMin(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="border p-2 rounded-lg w-full pr-8"
+                  ref={priceMinInputRef}
+                  onKeyDown={e => { if (e.key === "Enter") { priceMinInputRef.current && priceMinInputRef.current.blur(); } }}
+                />
+                {priceMin !== "" && priceMin !== 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPriceMin("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    tabIndex={-1}
+                    aria-label="Clear"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              {/* Max Price */}
+              <div className="flex-1 min-w-0 relative">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ราคาสูงสุด (Max THB)"
+                  value={priceMaxFocused && priceMax === 0 ? "" : (priceMax || "")}
+                  onFocus={() => {
+                    setPriceMaxFocused(true);
+                    if (priceMax === 0) setPriceMax("");
+                  }}
+                  onBlur={() => {
+                    setPriceMaxFocused(false);
+                    if (priceMax === "" || isNaN(priceMax)) setPriceMax(0);
+                  }}
+                  onChange={e => setPriceMax(e.target.value === "" ? "" : Number(e.target.value))}
+                  className="border p-2 rounded-lg w-full pr-8"
+                  ref={priceMaxInputRef}
+                  onKeyDown={e => { if (e.key === "Enter") { priceMaxInputRef.current && priceMaxInputRef.current.blur(); } }}
+                />
+                {priceMax !== "" && priceMax !== 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPriceMax("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    tabIndex={-1}
+                    aria-label="Clear"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 w-full mb-4 items-center overflow-x-auto scrollbar-hide py-1">
+              {/* Sort Order */}
+              <div className="flex-1 min-w-0">
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  className="w-full border p-2 rounded-lg"
+                >
+                  <option value="asc">ราคาต่ำสุด</option>
+                  <option value="desc">ราคาสูงสุด</option>
+                  <option value="alphaThAsc">ชื่อ (ก-ฮ)</option>
+                  <option value="alphaThDesc">ชื่อ (ฮ-ก)</option>
+                  <option value="alphaEnAsc">Name (A-Z)</option>
+                  <option value="alphaEnDesc">Name (Z-A)</option>
+                  <option value="distance">ระยะทาง (ใกล้สุด)</option>
+                </select>
+                {/* Reference location picker - only show if sorting by distance */}
+                {sortOrder === "distance" && (
+                  <>
+                    <div className="mt-2">
+                      <div className="font-medium text-sm mb-1">เลือกตำแหน่งอ้างอิง:</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="border px-3 py-1 rounded-xl bg-white hover:bg-gray-100 text-sm"
+                          onClick={() => setShowRefMap(true)}
+                        >
+                          {referenceLocation ? "เปลี่ยนตำแหน่งอ้างอิง" : "เลือกตำแหน่งอ้างอิงบนแผนที่"}
+                        </button>
+                        {referenceLocation && (
+                          <span className="text-xs text-gray-700">
+                            พิกัด: {referenceLocation.lat.toFixed(5)}, {referenceLocation.lng.toFixed(5)}
+                            <button
+                              className="ml-2 text-gray-400 hover:text-red-500"
+                              title="ลบตำแหน่งอ้างอิง"
+                              onClick={() => setReferenceLocation(null)}
+                            >×</button>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {sortOrder === "distance" && !referenceLocation && (
+                      <div className="mt-2 px-3 py-2 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm rounded-xl flex items-center gap-2">
+                        <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /></svg>
+                        กรุณาเลือกตำแหน่งอ้างอิงบนแผนที่ก่อนใช้งานการเรียงลำดับระยะทาง
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {/* Reset Filters Button (styled like List button) */}
+              <div className="flex-shrink-0">
+                <button
+                  className="bg-white border border-gray-300 text-black rounded-xl hover:bg-gray-100 transition rounded-xl px-3 py-2"
+                  onClick={() => {
+                    setKeyword(DEFAULT_FILTERS.keyword);
+                    setRegionFilter(DEFAULT_FILTERS.region);
+                    setProvinceFilter(DEFAULT_FILTERS.province);
+                    setPriceMin(DEFAULT_FILTERS.priceMin);
+                    setPriceMax(DEFAULT_FILTERS.priceMax);
+                    setSortOrder(DEFAULT_FILTERS.sortOrder);
+                    setFilterMode(DEFAULT_FILTERS.filterMode);
+                  }}
+                >
+                  รีเซ็ตตัวกรอง
+                </button>
+              </div>
+            </div>
 
-        {/* Filter mode segmented control */}
-        <FilterModeSegmented
-          filterMode={filterMode}
-          setFilterMode={setFilterMode}
-        />
-        <div className="mb-2 text-sm text-gray-700">
-          {filterMode === "hotel"
-            ? <>พบ {filteredHotels.length.toLocaleString()} โรงแรม</>
-            : filterMode === "other"
-              ? <>พบ {filteredHotels.length.toLocaleString()} ธุรกิจอื่น</>
-              : <>พบ {filteredHotels.length.toLocaleString()} ทั้งหมด</>
-          }
-        </div>
-        {/* Page size selector */}
-        {view === "list" && (
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm">แสดง:</span>
-            <select
-              value={pageSize}
-              onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-              className="border rounded p-1"
-            >
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-            <span className="text-sm">รายการต่อหน้า</span>
-          </div>
+            {/* Filter mode segmented control */}
+            <FilterModeSegmented
+              filterMode={filterMode}
+              setFilterMode={setFilterMode}
+            />
+            <div className="mb-2 text-sm text-gray-700">
+              {filterMode === "hotel"
+                ? <>พบ {filteredHotels.length.toLocaleString()} โรงแรม</>
+                : filterMode === "other"
+                  ? <>พบ {filteredHotels.length.toLocaleString()} ธุรกิจอื่น</>
+                  : <>พบ {filteredHotels.length.toLocaleString()} ทั้งหมด</>
+              }
+            </div>
+            {/* Page size selector */}
+            {view === "list" && (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">แสดง:</span>
+                <select
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  className="border rounded p-1"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-sm">รายการต่อหน้า</span>
+              </div>
+            )}
+            {/* Map/List Switch Buttons */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                className={`px-4 py-2 rounded-xl border ${view === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+                onClick={() => setView("list")}
+              >
+                <List className="inline-block w-4 h-4 mr-1" /> ตาราง
+              </button>
+              <button
+                className={`px-4 py-2 rounded-xl border ${view === "map" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+                onClick={() => setView("map")}
+              >
+                <Map className="inline-block w-4 h-4 mr-1" /> แผนที่
+              </button>
+            </div>
+          </>
         )}
-        {/* Map/List Switch Buttons */}
-        <div className="flex items-center gap-2 mb-4">
-          <button
-            className={`px-4 py-2 rounded-xl border ${view === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
-            onClick={() => setView("list")}
-          >
-            <List className="inline-block w-4 h-4 mr-1" /> ตาราง
-          </button>
-          <button
-            className={`px-4 py-2 rounded-xl border ${view === "map" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
-            onClick={() => setView("map")}
-          >
-            <Map className="inline-block w-4 h-4 mr-1" /> แผนที่
-          </button>
-        </div>
         {view === "list" ? ( 
           <div className="grid gap-4">
             {filteredHotels.length === 0 ? (
@@ -710,7 +809,19 @@ export default function App() {
             )}
           </div>
         ) : (
-          <MapView hotels={filteredHotels} setModalImage={setModalImage} />
+          <div
+            style={{
+              position: "fixed",
+              left: 8,
+              right: 8,
+              bottom: 8,
+              top: stickyBarHeight,
+              background: "white",
+              zIndex: 0
+            }}
+          >
+            <MapView hotels={filteredHotels} setModalImage={setModalImage} stickyBarHeight={stickyBarHeight} />
+          </div>
         )}
         {/* Pagination controls */}
         {view === "list" && filteredHotels.length > 0 && (
@@ -825,7 +936,7 @@ export default function App() {
         </div>
       )}
       {/* Sticky footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-gray-900 text-gray-100 text-center py-2 text-xs">
+      <div className="fixed bottom-0 left-0 right-0 z-60 bg-gray-900 text-gray-100 text-center py-2 text-xs">
         Developed by Chongsawad Saiaram @ 2025
       </div>
     </div>
@@ -833,14 +944,9 @@ export default function App() {
 }
 
 // Responsive height: fills screen below filters, above footer
-const mapContainerStyle = {
-  width: "100%",
-  height: "calc(100vh - 210px)",
-  borderRadius: "1rem"
-};
 const defaultCenter = { lat: 7.8804, lng: 98.3923 }; // Phuket center
 
-function MapView({ hotels, setModalImage }) {
+function MapView({ hotels, setModalImage, stickyBarHeight = 0 }) {
   // For Vite, use import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
@@ -884,6 +990,13 @@ function MapView({ hotels, setModalImage }) {
   }
 
   if (!isLoaded) return <div>Loading Map...</div>;
+
+  // Responsive map container style using stickyBarHeight
+  const mapContainerStyle = {
+    width: "100%",
+    height: `calc(100vh - ${stickyBarHeight}px)`,
+    borderRadius: "1rem"
+  };
 
   // Helper for contact details in InfoWindow
   function renderContactDetails(hotel) {
