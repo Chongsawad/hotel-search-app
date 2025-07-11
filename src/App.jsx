@@ -11,6 +11,20 @@ function getAbsoluteUrl(url) {
   return "https://" + url;
 }
 
+// Haversine formula for distance in km between [lng,lat] and {lng,lat}
+function calculateDistance([lng1, lat1], ref) {
+  if (!ref || typeof ref.lat !== "number" || typeof ref.lng !== "number") return null;
+  const toRad = (deg) => deg * Math.PI / 180;
+  const R = 6371; // km
+  const dLat = toRad(ref.lat - lat1);
+  const dLng = toRad(ref.lng - lng1);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(ref.lat)) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 
 export default function App() {
   const DEFAULT_FILTERS = {
@@ -105,6 +119,10 @@ export default function App() {
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
 
+  // Reference location state & map picker modal
+  const [referenceLocation, setReferenceLocation] = useState(null);
+  const [showRefMap, setShowRefMap] = useState(false);
+
   // Build unique/sorted region and province lists
   const regions = useMemo(
     () => [...new Set(hotels.map(h => h._full?.regionScope).filter(Boolean))].sort(),
@@ -147,13 +165,19 @@ export default function App() {
       return hotelMatch;
     });
 
-    // Sort by minimum room price according to sortOrder
+    // Sort logic
     return filtered.sort((a, b) => {
       if (sortOrder === "asc" || sortOrder === "desc") {
         // Sort by min room price
         const aMin = a.rooms.length > 0 ? Math.min(...a.rooms.map(r => r.price)) : Infinity;
         const bMin = b.rooms.length > 0 ? Math.min(...b.rooms.map(r => r.price)) : Infinity;
         return sortOrder === "asc" ? aMin - bMin : bMin - aMin;
+      }
+      if (sortOrder === "distance" && referenceLocation) {
+        // Sort by distance to referenceLocation
+        const aDist = a.location ? calculateDistance(a.location, referenceLocation) : Infinity;
+        const bDist = b.location ? calculateDistance(b.location, referenceLocation) : Infinity;
+        return aDist - bDist;
       }
       if (sortOrder === "alphaThAsc") {
         return (a.nameTh || "").localeCompare(b.nameTh || "", "th");
@@ -169,7 +193,27 @@ export default function App() {
       }
       return 0;
     });
-  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter, filterMode]);
+  }, [hotels, keyword, priceMin, priceMax, sortOrder, regionFilter, provinceFilter, filterMode, referenceLocation]);
+
+  // Automatically set referenceLocation to average of province hotels when provinceFilter changes
+  useEffect(() => {
+    if (!provinceFilter) return;
+    // Find all hotels in province with location
+    const provHotels = hotels.filter(h => h._full?.province && h._full.province.includes(provinceFilter) && h.location);
+    if (provHotels.length === 0) return;
+    // Average lat/lng
+    let sumLat = 0, sumLng = 0, count = 0;
+    provHotels.forEach(h => {
+      if (h.location && typeof h.location[0] === "number" && typeof h.location[1] === "number") {
+        sumLng += h.location[0];
+        sumLat += h.location[1];
+        count++;
+      }
+    });
+    if (count > 0) {
+      setReferenceLocation({ lng: sumLng / count, lat: sumLat / count });
+    }
+  }, [provinceFilter, hotels]);
 
   // Reset page to 1 when filters or sort change, including region/province
   useEffect(() => {
@@ -343,7 +387,40 @@ export default function App() {
               <option value="alphaThDesc">ชื่อ (ฮ-ก)</option>
               <option value="alphaEnAsc">Name (A-Z)</option>
               <option value="alphaEnDesc">Name (Z-A)</option>
+              <option value="distance">ระยะทาง (ใกล้สุด)</option>
             </select>
+            {/* Reference location picker - only show if sorting by distance */}
+            {sortOrder === "distance" && (
+              <>
+                <div className="mt-2">
+                  <div className="font-medium text-sm mb-1">เลือกตำแหน่งอ้างอิง:</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="border px-3 py-1 rounded-xl bg-white hover:bg-gray-100 text-sm"
+                      onClick={() => setShowRefMap(true)}
+                    >
+                      {referenceLocation ? "เปลี่ยนตำแหน่งอ้างอิง" : "เลือกตำแหน่งอ้างอิงบนแผนที่"}
+                    </button>
+                    {referenceLocation && (
+                      <span className="text-xs text-gray-700">
+                        พิกัด: {referenceLocation.lat.toFixed(5)}, {referenceLocation.lng.toFixed(5)}
+                        <button
+                          className="ml-2 text-gray-400 hover:text-red-500"
+                          title="ลบตำแหน่งอ้างอิง"
+                          onClick={() => setReferenceLocation(null)}
+                        >×</button>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {sortOrder === "distance" && !referenceLocation && (
+                  <div className="mt-2 px-3 py-2 bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm rounded-xl flex items-center gap-2">
+                    <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /></svg>
+                    กรุณาเลือกตำแหน่งอ้างอิงบนแผนที่ก่อนใช้งานการเรียงลำดับระยะทาง
+                  </div>
+                )}
+              </>
+            )}
           </div>
           {/* Reset Filters Button (styled like List button) */}
           <div className="flex-shrink-0">
@@ -420,37 +497,11 @@ export default function App() {
                   <div className="flex flex-col md:flex-row gap-4 p-4">
                     <div className="md:w-40 w-full flex-shrink-0">
                       {hotel.images[0] ? (
-                        <>
-                          <img
-                            src={hotel.images[0]}
-                            alt={hotel.nameTh}
-                            className="rounded-xl object-cover w-full h-28 md:h-36"
-                          />
-                          {hotel.images.length > 1 && (
-                            <button
-                              className="mt-1 w-fit flex items-center border rounded-xl px-3 py-1 text-xs"
-                              onClick={() => setOpenGallery(s => ({ ...s, [hotel.id]: !s[hotel.id] }))}
-                            >
-                              {openGallery[hotel.id] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                              <span className="ml-1">
-                                {openGallery[hotel.id] ? "ซ่อนรูปทั้งหมด" : `ดูรูปทั้งหมด (${hotel.images.length})`}
-                              </span>
-                            </button>
-                          )}
-                          {openGallery[hotel.id] && (
-                            <div className="flex gap-2 mt-2 overflow-x-auto">
-                              {hotel.images.map((img, idx) => (
-                                <img
-                                  src={img}
-                                  key={img+idx}
-                                  alt={hotel.nameTh || hotel.nameEn}
-                                  className="h-20 rounded-lg object-cover border cursor-pointer"
-                                  onClick={() => setModalImage(img)}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </>
+                        <img
+                          src={hotel.images[0]}
+                          alt={hotel.nameTh}
+                          className="rounded-xl object-cover w-full h-28 md:h-36"
+                        />
                       ) : (
                         <div className="rounded-xl bg-gray-200 w-full h-28 md:h-36 flex items-center justify-center text-gray-400 text-xs">
                           ไม่มีรูป
@@ -491,7 +542,26 @@ export default function App() {
                             Google Maps
                           </a>
                         ) : null}
+                        {/* Show distance if sorting by distance and ref location */}
+                        {sortOrder === "distance" && referenceLocation && hotel.location && (
+                          <span className="ml-2 text-xs text-blue-700">
+                            {(() => {
+                              const dist = calculateDistance(hotel.location, referenceLocation);
+                              return dist != null && isFinite(dist)
+                                ? `ห่าง ${dist.toFixed(2)} กม.`
+                                : "";
+                            })()}
+                          </span>
+                        )}
                       </div>
+      {/* Modal for reference location map picker - only show if sorting by distance */}
+      {sortOrder === "distance" && showRefMap && (
+        <ReferenceLocationModal
+          referenceLocation={referenceLocation}
+          setReferenceLocation={setReferenceLocation}
+          onClose={() => setShowRefMap(false)}
+        />
+      )}
                       <div className="text-xs text-gray-500 mt-1">ติดต่อ: {hotel.contact}</div>
                       <button
                         className="mt-3 w-fit flex items-center border rounded-xl px-3 py-1 text-sm"
@@ -556,6 +626,44 @@ export default function App() {
                           })()}
                         </div>
                       )}
+                      {/* Gallery expand/collapse moved here, below contact details */}
+                      {(() => {
+                        // If filterMode === "other" and hotel has multiple images, default open
+                        const galleryOpen = filterMode === "other" && hotel.images.length > 1 ? true : openGallery[hotel.id];
+                        return (
+                          <>
+                            {hotel.images.length > 1 && (
+                              <button
+                                className="mt-3 w-fit flex items-center border rounded-xl px-3 py-1 text-sm"
+                                onClick={() =>
+                                  setOpenGallery(s => ({
+                                    ...s,
+                                    [hotel.id]: !(filterMode === "other" && hotel.images.length > 1 ? true : openGallery[hotel.id])
+                                  }))
+                                }
+                              >
+                                {galleryOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                <span className="ml-1">
+                                  {galleryOpen ? "ซ่อนรูปทั้งหมด" : `ดูรูปทั้งหมด (${hotel.images.length})`}
+                                </span>
+                              </button>
+                            )}
+                            {galleryOpen && (
+                              <div className="flex gap-2 mt-2 overflow-x-auto">
+                                {hotel.images.map((img, idx) => (
+                                  <img
+                                    src={img}
+                                    key={img+idx}
+                                    alt={hotel.nameTh || hotel.nameEn}
+                                    className="h-20 rounded-lg object-cover border cursor-pointer"
+                                    onClick={() => setModalImage(img)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                       {filterMode !== "other" && (
                         <>
                           <button
@@ -1022,6 +1130,65 @@ function FilterModeSegmented({ filterMode, setFilterMode }) {
             <b>ทั้งหมด (All):</b> แสดงทุกธุรกิจโดยไม่แยกประเภท (ไม่มีตัวกรองราคา)
           </span>
         )}
+      </div>
+    </div>
+  );
+}
+// Modal for picking reference location
+function ReferenceLocationModal({ referenceLocation, setReferenceLocation, onClose }) {
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  });
+  const [tempLoc, setTempLoc] = useState(referenceLocation || { lat: 7.8804, lng: 98.3923 });
+  // Center on ref loc, or Phuket
+  const center = referenceLocation || { lat: 7.8804, lng: 98.3923 };
+  return (
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="bg-white rounded-2xl shadow-xl p-4 max-w-md w-full relative">
+        <button
+          className="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-2xl"
+          onClick={onClose}
+        >×</button>
+        <div className="font-bold text-base mb-2">เลือกตำแหน่งอ้างอิงบนแผนที่</div>
+        <div className="mb-2 text-xs text-gray-700">
+          คลิกบนแผนที่เพื่อเลือกจุดอ้างอิงสำหรับคำนวณระยะทาง
+        </div>
+        <div style={{ width: "100%", height: 280 }}>
+          {isLoaded ? (
+            <GoogleMap
+              mapContainerStyle={{ width: "100%", height: "100%", borderRadius: "1rem" }}
+              center={tempLoc}
+              zoom={11}
+              onClick={e => {
+                setTempLoc({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+              }}
+            >
+              <Marker
+                position={tempLoc}
+                draggable
+                onDragEnd={e => {
+                  setTempLoc({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+                }}
+              />
+            </GoogleMap>
+          ) : (
+            <div className="flex items-center justify-center h-full">Loading Map...</div>
+          )}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-xs text-gray-700">
+            พิกัด: {tempLoc.lat.toFixed(5)}, {tempLoc.lng.toFixed(5)}
+          </span>
+          <button
+            className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-xl font-medium"
+            onClick={() => {
+              setReferenceLocation(tempLoc);
+              onClose();
+            }}
+          >
+            ใช้ตำแหน่งนี้
+          </button>
+        </div>
       </div>
     </div>
   );
