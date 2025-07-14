@@ -28,11 +28,20 @@ if not CLIENT_ID:
     print("Missing COGNITO_CLIENT_ID!")
     sys.exit(1)
 
+import uuid
 url = "https://cognito-idp.ap-southeast-1.amazonaws.com/"
 headers = {
     "Content-Type": "application/x-amz-json-1.1",
+    "X-Amz-User-Agent": "amplify-flutter/2.6.1 Chrome/138.0.0.0 Auth/6 aws-sdk-dart/0.3.2",
+    "sec-ch-ua-platform": "\"macOS\"",
+    "Cache-Control": "no-store",
     "Referer": "https://app.tat.or.th/",
-    "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth"
+    "sec-ch-ua": "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"138\", \"Google Chrome\";v=\"138\"",
+    "sec-ch-ua-mobile": "?0",
+    "amz-sdk-request": "attempt=1; max=3",
+    "amz-sdk-invocation-id": str(uuid.uuid4()),
+    "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 }
 payload = {
     "AuthFlow": "REFRESH_TOKEN_AUTH",
