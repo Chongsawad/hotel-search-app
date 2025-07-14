@@ -41,8 +41,25 @@ payload = {
         "REFRESH_TOKEN": REFRESH_TOKEN
     }
 }
+# Print masked payload before sending
+masked_payload = {
+    **payload,
+    "AuthParameters": {
+        **payload["AuthParameters"],
+        "REFRESH_TOKEN": mask(payload["AuthParameters"]["REFRESH_TOKEN"])
+    }
+}
+print("Sending request payload (masked):")
+print(json.dumps(masked_payload, indent=2))
 resp = requests.post(url, headers=headers, json=payload)
-resp.raise_for_status()
+try:
+    resp.raise_for_status()
+except requests.HTTPError as e:
+    print(f"HTTP error: {e}")
+    print(f"Status code: {resp.status_code}")
+    print("Response body:")
+    print(resp.text)
+    sys.exit(1)
 data = resp.json()
 # Save the Access Token and Id Token
 auth_result = data.get('AuthenticationResult', {})
