@@ -43,6 +43,10 @@ jobs:
           CURL_POST_DATA: ${{ github.event.inputs.curl_post_data || vars.CURL_POST_DATA }}
         run: |
           set -e
+          if [ ! -s access_token.txt ]; then
+            echo "ERROR: Refresh token step failed, access_token.txt is missing or empty."
+            exit 1
+          fi
           http_code=$(curl --insecure --write-out "%{http_code}" --silent --output raw-data.json \
             --request POST \
             --url https://backend-api.tat.or.th/mobile/buyer/booking/sellers \

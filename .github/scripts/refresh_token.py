@@ -3,6 +3,19 @@ import sys
 import requests
 import json
 
+# Print masked environment variables
+def mask(val):
+    return val[:3] + '*' * (len(val) - 3) if val and len(val) > 3 else '*' * len(val)
+
+print("Environment variables (masked):")
+for key in ["COGNITO_REFRESH_TOKEN", "COGNITO_CLIENT_ID"]:
+    v = os.environ.get(key)
+    if v:
+        print(f"  {key}: {mask(v)}")
+    else:
+        print(f"  {key}: (not set)")
+print("---")
+
 # Get refresh token from env or arguments
 REFRESH_TOKEN = os.environ.get('COGNITO_REFRESH_TOKEN') or (sys.argv[1] if len(sys.argv) > 1 else None)
 if not REFRESH_TOKEN:
