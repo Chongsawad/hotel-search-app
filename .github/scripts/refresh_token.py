@@ -46,4 +46,8 @@ with open("access_token.txt", "w") as f:
 
 print("Access token refreshed and written to access_token.txt")
 
+# Print masked access token
+masked = access_token[:3] + '*' * (len(access_token) - 3)
+print(f"Access token (masked): {masked}")
+
 # Reminder: Make sure to set COGNITO_CLIENT_ID as a secret in your GitHub Actions workflow environment.
