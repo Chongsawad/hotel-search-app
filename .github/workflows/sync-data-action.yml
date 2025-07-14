@@ -29,10 +29,17 @@ jobs:
       - name: Install requirements
         run: pip install requests
 
+      - name: Refresh Cognito Token
+        env:
+          COGNITO_REFRESH_TOKEN: ${{ secrets.COGNITO_REFRESH_TOKEN }}
+          COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
+        run: |
+          python .github/scripts/refresh_token.py
+
       - name: Fetch JSON data from API
         # Allows override of CURL_POST_DATA via manual dispatch, otherwise falls back to repo variable
         env:
-          AUTH_HEADER: ${{ secrets.AUTH_HEADER }}
+          AUTH_HEADER: "Bearer $(cat access_token.txt)"
           CURL_POST_DATA: ${{ github.event.inputs.curl_post_data || vars.CURL_POST_DATA }}
         run: |
           set -e
