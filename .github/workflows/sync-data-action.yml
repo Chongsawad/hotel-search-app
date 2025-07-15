@@ -29,24 +29,13 @@ jobs:
       - name: Install requirements
         run: pip install requests
 
-      - name: Refresh Cognito Token
-        env:
-          COGNITO_REFRESH_TOKEN: ${{ secrets.COGNITO_REFRESH_TOKEN }}
-          COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
-        run: |
-          python .github/scripts/refresh_token.py
-
       - name: Fetch JSON data from API
         # Allows override of CURL_POST_DATA via manual dispatch, otherwise falls back to repo variable
         env:
-          AUTH_HEADER: "Bearer $(cat access_token.txt)"
+          AUTH_HEADER: "Bearer ${{ secrets.AUTH_HEADER }}"
           CURL_POST_DATA: ${{ github.event.inputs.curl_post_data || vars.CURL_POST_DATA }}
         run: |
           set -e
-          if [ ! -s access_token.txt ]; then
-            echo "ERROR: Refresh token step failed, access_token.txt is missing or empty."
-            exit 1
-          fi
           http_code=$(curl --insecure --write-out "%{http_code}" --silent --output raw-data.json \
             --request POST \
             --url https://backend-api.tat.or.th/mobile/buyer/booking/sellers \
